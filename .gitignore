@@ -1,0 +1,10 @@
+# Build mappák
+[Bb]in/
+[Oo]bj/
+
+# Rider / IDE mappák
+.idea/
+*.user
+
+# Egyéb átmeneti fájlok
+*.cache
