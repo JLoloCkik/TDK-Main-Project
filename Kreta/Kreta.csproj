@@ -16,6 +16,7 @@
             <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
             <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
         </PackageReference>
+        <PackageReference Include="DotNetEnv" Version="3.2.0" />
         <PackageReference Include="Google.GenAI" Version="1.12.0" />
         <PackageReference Include="LibGit2Sharp" Version="0.31.0" />
         <PackageReference Include="Microsoft.CodeAnalysis.Common" Version="5.0.0" />
