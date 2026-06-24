@@ -8,8 +8,6 @@ using Kreta.Core;
 
 public class AiService : IAiService {
     public async Task<AiEvolveResponse> GenerateFeatureAsync(string userPrompt, Role userRole) {
-        string[] modelsToTry = ["gemini-3.5-flash", "gemini-3-flash", "gemini-2.5-flash"];
-
 
         string systemInstruction = """
                                    You are the automated C# and Avalonia UI compiler-agent for "EvolKréta", a self-evolving educational system.
@@ -72,38 +70,19 @@ public class AiService : IAiService {
                                    """;
 
         var client = new Client();
+        
+        // ITT HASZNÁLJUK A STABIL, FIZETŐS MODELLT!
+        var response = await client.Models.GenerateContentAsync(
+          model: "gemini-2.5-pro", 
+          contents: $"{systemInstruction}\n\nKérés (Jogosultság: {userRole}): {userPrompt}"
+        );
 
-        Exception? lastException = null;
-        foreach (var model in modelsToTry) {
-            for (int retry = 0; retry < 3; retry++) {
-                try {
-                    var response = await client.Models.GenerateContentAsync(
-                        model: model,
-                        contents: $"{systemInstruction}\n\nKérés (Jogosultság: {userRole}): {userPrompt}"
-                    );
+        var rawJson = response.Candidates?[0].Content?.Parts?[0].Text ?? "";
+        rawJson = rawJson.Replace("```json", "").Replace("```", "").Trim();
 
-                    var rawJson = response.Candidates?[0].Content?.Parts?[0].Text ?? "";
+        var parsedResponse = JsonSerializer.Deserialize<AiEvolveResponse>(rawJson, 
+          new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
-                    rawJson = rawJson.Replace("```json", "").Replace("```", "").Trim();
-
-                    var parsedResponse = JsonSerializer.Deserialize<AiEvolveResponse>(rawJson,
-                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-                    return parsedResponse ?? throw new Exception("Sikertelen JSON deszerializáció.");
-                }
-                catch (Exception ex) when (ex.Message.Contains("demand") || ex.Message.Contains("503") ||
-                                           ex.Message.Contains("UNAVAILABLE")) {
-                    lastException = ex;
-
-                    await Task.Delay(1000 * (retry + 1));
-                }
-                catch (Exception ex) {
-                    lastException = ex;
-                    break;
-                }
-            }
-        }
-
-        throw new Exception($"Nem sikerült kapcsolatot lépni az AI-val: {lastException?.Message}");
+        return parsedResponse ?? throw new Exception("Sikertelen JSON deszerializáció.");
     }
 }

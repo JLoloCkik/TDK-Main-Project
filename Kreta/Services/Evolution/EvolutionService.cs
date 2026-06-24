@@ -33,7 +33,6 @@ public class EvolutionService : IEvolutionService {
             MetadataReference.CreateFromFile(Assembly.Load("System.ObjectModel").Location),
             MetadataReference.CreateFromFile(Assembly.Load("System.ComponentModel").Location),
             MetadataReference.CreateFromFile(Assembly.Load("Avalonia.Base").Location), 
-            MetadataReference.CreateFromFile(Assembly.Load("Avalonia.Diagnostics").Location), 
             MetadataReference.CreateFromFile(Assembly.Load("Avalonia.Markup.Xaml").Location), 
             MetadataReference.CreateFromFile(Assembly.Load("Avalonia.Controls").Location),
             MetadataReference.CreateFromFile(typeof(Avalonia.Layout.HorizontalAlignment).Assembly.Location)
