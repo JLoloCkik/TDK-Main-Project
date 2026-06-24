@@ -8,7 +8,7 @@ namespace Kreta.Services.Git;
 public class GitService : IGitService {
     private readonly string _projectRoot;
     
-    GitService() {
+    public GitService() {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir != null && !dir.GetFiles("*.csproj").Any()) {
             dir = dir.Parent;
