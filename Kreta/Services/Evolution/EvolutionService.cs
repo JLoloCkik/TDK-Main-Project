@@ -16,17 +16,27 @@ public class EvolutionService : IEvolutionService {
         string dllPath = Path.Combine(AppContext.BaseDirectory, "Dynamic", "DynamicFeatures.dll");
 
         Directory.CreateDirectory(Path.GetDirectoryName(dllPath)!);
+        
+        string fullCodeWithUsings =
+            $"global using Kreta.Core;\nglobal using Avalonia.Controls;\nglobal using System.Linq;\nglobal using System.Collections.Generic;\n{handlerCode}";
 
-        SyntaxTree syntaxTree = CSharpSyntaxTree.ParseText(handlerCode);
-
+        SyntaxTree syntaxTree = CSharpSyntaxTree.ParseText(fullCodeWithUsings);
+        
         var references = new List<MetadataReference> {
             MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
             MetadataReference.CreateFromFile(typeof(Console).Assembly.Location),
             MetadataReference.CreateFromFile(typeof(IEvolView).Assembly.Location),
             MetadataReference.CreateFromFile(Assembly.Load("System.Runtime").Location),
             MetadataReference.CreateFromFile(Assembly.Load("System.Collections").Location),
+            MetadataReference.CreateFromFile(Assembly.Load("System.Linq").Location),
+            MetadataReference.CreateFromFile(Assembly.Load("System.Linq.Expressions").Location),
+            MetadataReference.CreateFromFile(Assembly.Load("System.ObjectModel").Location),
+            MetadataReference.CreateFromFile(Assembly.Load("System.ComponentModel").Location),
+            MetadataReference.CreateFromFile(Assembly.Load("Avalonia.Base").Location), 
+            MetadataReference.CreateFromFile(Assembly.Load("Avalonia.Diagnostics").Location), 
+            MetadataReference.CreateFromFile(Assembly.Load("Avalonia.Markup.Xaml").Location), 
             MetadataReference.CreateFromFile(Assembly.Load("Avalonia.Controls").Location),
-            MetadataReference.CreateFromFile(Assembly.Load("Avalonia.Layout").Location)
+            MetadataReference.CreateFromFile(typeof(Avalonia.Layout.HorizontalAlignment).Assembly.Location)
         };
 
         var compilation = CSharpCompilation.Create(
