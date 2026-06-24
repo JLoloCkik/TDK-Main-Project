@@ -21,7 +21,7 @@ public class SqliteStudentContext : IStudentContext {
             .Where(g => g.StudentId == _studentId)
             .ToList();
 
-    public User GetMyProfile()
+    public User? GetMyProfile()
         => _dbContext.Users
             .FirstOrDefault(u => u.Id == _studentId);
 }

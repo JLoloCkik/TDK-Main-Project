@@ -15,7 +15,7 @@ public class AstAnalyzer {
         var root = tree.GetCompilationUnitRoot();
 
         foreach (UsingDirectiveSyntax usingDirective in root.Usings) {
-            string namespaceName = usingDirective.Name.ToString();
+            string namespaceName = usingDirective.Name?.ToString() ?? string.Empty;
 
             if (ForbiddenNamespaces.Contains(namespaceName)) {
                 return false;

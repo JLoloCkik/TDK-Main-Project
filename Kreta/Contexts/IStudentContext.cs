@@ -6,5 +6,5 @@ namespace Kreta.Contexts;
 public interface IStudentContext
 {
     List<Grade> GetMyGrades();
-    User GetMyProfile();
+    User? GetMyProfile();
 }
