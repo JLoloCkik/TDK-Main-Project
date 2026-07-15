@@ -131,6 +131,14 @@ public partial class MainWindow : Window
                         }
                     }
                 }
+                else
+                {
+                    // Mentett modul fordítási hibájának konzolra írása
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine($"\n[RENDSZERINDÍTÁSI SÚLYOS HIBA] Nem sikerült lefordítani a korábbi modult ({viewName}):");
+                    Console.WriteLine(result.ErrorMessage);
+                    Console.ResetColor();
+                }
             }
 
             StatusText.Text = $"{loadedCount} modul sikeresen betöltve a lemezről.";
@@ -302,6 +310,23 @@ public partial class MainWindow : Window
             else
             {
                 StatusText.Text = "Fordítási hiba! Próbálja meg finomítani a promptot.";
+
+                // KIÍRÁS A KONZOLRA (terminálba) - GENERÁLT FORRÁSKÓD ÉS HIBAÜZENETEK IS!
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.WriteLine("\n========================================================================");
+                Console.WriteLine($"[GENERÁLT C# FORRÁSKÓD - {response.ViewName.ToUpper()}]");
+                Console.WriteLine("========================================================================");
+                Console.ForegroundColor = ConsoleColor.White;
+                Console.WriteLine(response.SourceCode);
+                
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("========================================================================");
+                Console.WriteLine($"[FORDÍTÁSI HIBAÜZENETEK]");
+                Console.WriteLine("========================================================================");
+                Console.WriteLine(result.ErrorMessage);
+                Console.WriteLine("========================================================================\n");
+                Console.ResetColor();
+
                 MainContentArea.Content = new ScrollViewer
                 {
                     Content = new TextBlock
