@@ -11,11 +11,11 @@
 
         <!-- BAL OLDALSÁV (Sidebar) -->
         <Border Grid.Column="0" Background="#1F2D3D">
-            <Grid RowDefinitions="Auto, Auto, *, Auto">
+            <Grid RowDefinitions="Auto, Auto, *, Auto"> 
 
                 <!-- Logó -->
                 <StackPanel Grid.Row="0" Margin="18,22,18,10">
-                    <TextBlock Text="🏫 EvolKréta" FontSize="22" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
+                    <TextBlock Text="EvolKréta" FontSize="22" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
                     <TextBlock Text="Önfejlesztő Rendszer" FontSize="11" Foreground="#8FA3B8" HorizontalAlignment="Center" Margin="0,4,0,0"/>
                 </StackPanel>
 
