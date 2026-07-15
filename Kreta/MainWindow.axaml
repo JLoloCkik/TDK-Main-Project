@@ -2,82 +2,104 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="Kreta.MainWindow"
         Title="EvolKréta - Önfejlesztő Iskolai Rendszer"
-        Width="900" Height="600"
-        WindowStartupLocation="CenterScreen">
+        Width="1000" Height="650"
+        MinWidth="800" MinHeight="550"
+        WindowStartupLocation="CenterScreen"
+        Background="#F4F6F7">
 
-    <!-- Fő rács: Bal oldali menü (220px) és Jobb oldali tartalom (*) -->
-    <Grid ColumnDefinitions="220, *">
+    <Grid ColumnDefinitions="230, *">
 
         <!-- 1. ZÓNA: BAL OLDALSÁV (Sidebar) -->
-        <Border Grid.Column="0" Background="#2C3E50" BorderBrush="#1A252F" BorderThickness="0,0,1,0">
+        <Border Grid.Column="0" Background="#1F2D3D">
             <Grid RowDefinitions="Auto, Auto, *, Auto">
-                
-                <!-- Alkalmazás címe -->
-                <StackPanel Grid.Row="0" Margin="15">
-                    <TextBlock Text="🏫 EvolKréta" FontSize="20" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
-                    <TextBlock Text="Önfejlesztő verzió" FontSize="10" Foreground="#BDC3C7" HorizontalAlignment="Center" Margin="0,5,0,0"/>
+
+                <StackPanel Grid.Row="0" Margin="18,22,18,10">
+                    <TextBlock Text="🏫 EvolKréta" FontSize="21" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Önfejlesztő verzió" FontSize="10" Foreground="#8FA3B8" HorizontalAlignment="Center" Margin="0,4,0,0"/>
                 </StackPanel>
 
-                <!-- Szerepkör választó a menüben -->
-                <StackPanel Grid.Row="1" Margin="15,0,15,10">
-                    <TextBlock Text="🔑 Szerepkör szimuláció:" FontSize="11" Foreground="#BDC3C7" Margin="0,0,0,5"/>
-                    <ComboBox x:Name="RoleSelector" HorizontalAlignment="Stretch" SelectedIndex="0">
-                        <ComboBoxItem Content="👨‍🎓 Diák (Kovács János)" Tag="Student"/>
-                        <ComboBoxItem Content="👩‍🏫 Tanár (Szabó Mária)" Tag="Teacher"/>
-                        <ComboBoxItem Content="👑 Igazgató (Nagy Péter)" Tag="Director"/>
-                    </ComboBox>
+                <StackPanel Grid.Row="1" Margin="16,6,16,10">
+                    <TextBlock Text="🔑 SZEREPKÖR SZIMULÁCIÓ" FontSize="10" FontWeight="SemiBold"
+                               Foreground="#6E85A0" Margin="2,0,0,6"/>
+                    <Border Background="#28394D" CornerRadius="8" Padding="2">
+                        <ComboBox x:Name="RoleSelector" HorizontalAlignment="Stretch"
+                                  SelectedIndex="0" Background="Transparent" BorderThickness="0">
+                            <ComboBoxItem Content="👨‍🎓 Diák (Kovács János)" Tag="Student"/>
+                            <ComboBoxItem Content="👩‍🏫 Tanár (Szabó Mária)" Tag="Teacher"/>
+                            <ComboBoxItem Content="👑 Igazgató (Nagy Péter)" Tag="Director"/>
+                        </ComboBox>
+                    </Border>
                 </StackPanel>
-                
-                <!-- Dinamikus Menügombok Panelje (Ide kerülnek az AI által generált gombok) -->
-                <ScrollViewer Grid.Row="2" Margin="10">
-                    <StackPanel x:Name="SidebarMenuPanel" Spacing="5">
-        
+
+                <ScrollViewer Grid.Row="2" Margin="10,4">
+                    <StackPanel x:Name="SidebarMenuPanel" Spacing="6">
                         <!-- [INJECT BUTTON] -->
                     </StackPanel>
                 </ScrollViewer>
 
-                <!-- Rendszerállapot kijelző alul -->
-                <StackPanel Grid.Row="3" Margin="10" Spacing="2">
-                    <TextBlock x:Name="EvolverStatusText" FontSize="10" Foreground="#2ECC71" Text="🟢 Evolúció: Aktív" TextWrapping="Wrap"/>
-                    <TextBlock x:Name="StatusText" FontSize="9" Foreground="#95A5A6" Text="Készen áll a fejlesztésre." TextWrapping="Wrap"/>
-                </StackPanel>
+                <Border Grid.Row="3" Background="#182533" Padding="14,12">
+                    <StackPanel Spacing="4">
+                        <TextBlock x:Name="EvolverStatusText" FontSize="10" Foreground="#2ECC71"
+                                   Text="🟢 Evolúció: Aktív" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="StatusText" FontSize="9" Foreground="#8FA3B8"
+                                   Text="Készen áll a fejlesztésre." TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
             </Grid>
         </Border>
 
-        <!-- JOBB OLDALI TARTALOM (Központi kijelző és az AI vezérlő) -->
+        <!-- JOBB OLDALI TARTALOM -->
         <Grid Grid.Column="1" RowDefinitions="*, Auto">
 
-            <!-- 2. ZÓNA: KÖZPONTI KIJELZŐ (Ide töltődnek be az ablakok) -->
-            <Border Grid.Row="0" Background="#F8F9F9" Padding="20">
-                <ContentControl x:Name="MainContentArea">
-                    <TextBlock Text="Üdvözöljük az EvolKrétában! Válasszon funkciót a bal oldalon, vagy kérjen újat alul." 
-                               VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="#7F8C8D" FontSize="14"/>
-                </ContentControl>
-            </Border>
+            <!-- 2. ZÓNA: KÖZPONTI KIJELZŐ -->
+            <Grid Grid.Row="0">
+                <Border Background="#F4F6F7" Padding="24">
+                    <ContentControl x:Name="MainContentArea" HorizontalContentAlignment="Stretch">
+                        <TextBlock Text="Üdvözöljük az EvolKrétában! Válasszon szerepkört a bal oldalon, vagy kérjen új funkciót alul."
+                                   VerticalAlignment="Center" HorizontalAlignment="Center"
+                                   Foreground="#95A5A6" FontSize="14" TextWrapping="Wrap" MaxWidth="500"
+                                   TextAlignment="Center"/>
+                    </ContentControl>
+                </Border>
 
-            <!-- 3. ZÓNA: ALSÓ AI STÚDIÓ (A fejlesztő pult) -->
-            <Border Grid.Row="1" Background="#EAEDED" Padding="15" BorderBrush="#BDC3C7" BorderThickness="0,1,0,0">
+                <!-- "Dolgozom" overlay generálás közben -->
+                <Border x:Name="BusyIndicator" IsVisible="False"
+                        Background="#B0FFFFFF" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" Width="240">
+                        <ProgressBar IsIndeterminate="True" Height="6" CornerRadius="3"/>
+                        <TextBlock Text="🤖 Az AI dolgozik a kérésen..." HorizontalAlignment="Center"
+                                   Foreground="#2C3E50" FontSize="13" FontWeight="SemiBold"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- 3. ZÓNA: ALSÓ AI STÚDIÓ -->
+            <Border Grid.Row="1" Background="White" Padding="16"
+                    BoxShadow="0 -2 8 0 #10000000">
                 <Grid ColumnDefinitions="*, Auto, Auto, Auto">
-                    
-                    <!-- Prompt beviteli mező -->
-                    <TextBox x:Name="PromptInput" Grid.Column="0" 
-                             PlaceholderText="Írja be, milyen új iskolai funkciót vagy ablakot szeretne fejleszteni..." 
-                             Margin="5" Height="40" VerticalContentAlignment="Center"/>
 
-                    <!-- 🤖 Fejlesztés indítása gomb -->
-                    <Button x:Name="AiButton" Grid.Column="1" Content="🤖 Fejlesztés" 
-                            Margin="5" Padding="15,0" Height="40" VerticalContentAlignment="Center" Background="#3498DB" Foreground="White"/>
+                    <Border Grid.Column="0" Background="#F0F2F4" CornerRadius="8" Margin="0,0,8,0">
+                        <TextBox x:Name="PromptInput" BorderThickness="0" Background="Transparent"
+                                 PlaceholderText="Írja be, milyen új iskolai funkciót vagy ablakot szeretne fejleszteni..."
+                                 Height="42" VerticalContentAlignment="Center" Padding="12,0"/>
+                    </Border>
 
-                    <!-- Jóváhagyás gomb (Alapértelmezetten rejtett) -->
-                    <Button x:Name="ApproveButton" Grid.Column="2" Content="✅ Jóváhagyás" 
-                            Margin="5" Height="40" VerticalContentAlignment="Center" Background="#2ECC71" Foreground="White" IsVisible="False"/>
+                    <Button x:Name="AiButton" Grid.Column="1" Content="🤖 Fejlesztés"
+                            Padding="16,0" Height="42" VerticalContentAlignment="Center"
+                            Background="#3498DB" Foreground="White" CornerRadius="8" FontWeight="SemiBold"
+                            Margin="0,0,6,0"/>
 
-                    <!-- Elvetés gomb (Alapértelmezetten rejtett) -->
-                    <Button x:Name="DiscardButton" Grid.Column="3" Content="❌ Elvetés" 
-                            Margin="5" Height="40" VerticalContentAlignment="Center" Background="#E74C3C" Foreground="White" IsVisible="False"/>
+                    <Button x:Name="ApproveButton" Grid.Column="2" Content="✅ Jóváhagyás"
+                            Height="42" VerticalContentAlignment="Center"
+                            Background="#2ECC71" Foreground="White" CornerRadius="8" FontWeight="SemiBold"
+                            IsVisible="False" Margin="0,0,6,0"/>
+
+                    <Button x:Name="DiscardButton" Grid.Column="3" Content="❌ Elvetés"
+                            Height="42" VerticalContentAlignment="Center"
+                            Background="#E74C3C" Foreground="White" CornerRadius="8" FontWeight="SemiBold"
+                            IsVisible="False"/>
                 </Grid>
             </Border>
-
         </Grid>
     </Grid>
 </Window>

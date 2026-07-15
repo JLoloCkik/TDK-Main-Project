@@ -13,7 +13,15 @@ public class KretaDbContext : DbContext
     
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
-        optionsBuilder.UseSqlite("Data Source=kreta.db");
+        // Abszolút útvonalat használunk a projekt gyökeréhez képest, hogy
+        // ne jöjjön létre több, egymástól eltérő kreta.db fájl attól függően,
+        // honnan indítjuk az alkalmazást (ez korábban valódi hiba volt).
+        string? root = Kreta.Services.PathHelper.FindProjectRoot();
+        string dbPath = root != null
+            ? System.IO.Path.Combine(root, "kreta.db")
+            : "kreta.db";
+
+        optionsBuilder.UseSqlite($"Data Source={dbPath}");
     }
 
     public void Seed()

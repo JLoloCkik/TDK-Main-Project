@@ -36,4 +36,10 @@
       <Folder Include="ViewModels\" />
       <Folder Include="Views\" />
     </ItemGroup>
+
+    <ItemGroup>
+      <!-- Biztonsági háló: ha valaki mégis a kimeneti mappából futtatja és a
+           PathHelper valamiért nem találná a .env-et, legyen ott egy másolat is. -->
+      <None Include=".env" CopyToOutputDirectory="PreserveNewest" Condition="Exists('.env')" />
+    </ItemGroup>
 </Project>
