@@ -16,7 +16,6 @@ public class AiService : IAiService
     {
         _httpClient = new HttpClient();
 
-        // DotNetEnv betöltése a helyi .env fájlból, ha létezik
         try
         {
             DotNetEnv.Env.Load();
@@ -29,11 +28,9 @@ public class AiService : IAiService
 
     private string GetApiKey()
     {
-        // 1. Környezeti változók ellenőrzése
         var key = Environment.GetEnvironmentVariable("GEMINI_API_KEY")
                   ?? Environment.GetEnvironmentVariable("GOOGLE_API_KEY");
 
-        // 2. Ha ott nincs, .env fájlból olvassuk be
         if (string.IsNullOrEmpty(key))
         {
             try
@@ -66,8 +63,6 @@ public class AiService : IAiService
                 "export GEMINI_API_KEY=\"a_te_kulcsod_itt\" && dotnet run");
         }
 
-        // Csak v1beta végpontokat használunk, mivel a strukturált JSON és a rendszer-szabályzat csak itt támogatott megbízhatóan.
-        // Bevezettük a rendkívül stabil gemini-2.0-flash és gemini-1.5-pro modelleket is.
         var fallbackMatrix = new[]
         {
             new { Version = "v1beta", Model = "gemini-2.5-flash" },
@@ -108,31 +103,27 @@ public class AiService : IAiService
                     Console.WriteLine(
                         $"[AI Kapcsolat - Próbálkozás sikertelen ({attempt.Version}/{attempt.Model})]: {ex.Message}");
 
-                    // Ha hitelesítési hiba van (403), felesleges próbálkozni a többi modellel is
                     if (ex.Message.Contains("403") || ex.Message.Contains("API_KEY_INVALID"))
                     {
                         throw new Exception(
                             $"Érvénytelen Gemini API kulcs! Ellenőrizze a beállításokat. Részletek: {ex.Message}");
                     }
 
-                    // Ha nem található a modell (404) vagy hibás a kérés (400), azonnal lépünk a következő modellre
                     if (ex.Message.Contains("404") || ex.Message.Contains("400"))
                     {
                         break;
                     }
 
-                    // Átmeneti szerverhibák (503 túlterheltség, 429 rátakorlát) esetén exponenciális várakozás után újrapróbáljuk
                     if (retry < maxRetries - 1 && (ex.Message.Contains("503") || ex.Message.Contains("429") ||
                                                    ex.Message.Contains("Hálózati hiba")))
                     {
                         Console.WriteLine(
                             $"[AI Kapcsolat] Átmeneti hiba észlelve. Várakozás {delayMs} ms-ig az újrapróbálkozás előtt...");
                         await Task.Delay(delayMs);
-                        delayMs *= 2; // Exponenciális növekedés a várakozási időben
+                        delayMs *= 2;
                     }
                     else
                     {
-                        // Ha elfogytak a próbálkozások ennél a modellnél, továbblépünk a következőre a mátrixban
                         break;
                     }
                 }
@@ -149,7 +140,6 @@ public class AiService : IAiService
         var url =
             $"https://generativelanguage.googleapis.com/{apiVersion}/models/{modelName}:generateContent?key={apiKey}";
 
-        // A továbbfejlesztett, szigorított, hibamentes generálást kikényszerítő rendszer-szabályzat
         var systemInstruction =
             $@"You are the automated C# and Avalonia UI compiler-agent for ""EvolKréta"", a self-evolving educational system.
 Your objective is to generate safe, compile-safe, and strictly role-appropriate C# code for a dynamic view.
@@ -237,7 +227,10 @@ CRITICAL C# COMPILATION RULES (VIOLATION WILL BREAK THE BUILD):
 9. IEvolView INTERFACE MEMBERS (MUST BE IMPLEMENTED EXACTLY):
    - `public string Name => ""A funkció magyar neve"";`
    - `public string Description => ""A funkció rövid magyar leírása"";` (MANDATORY property, do not omit!)
-   - `public Control CreateView()` (THE RETURN TYPE MUST BE EXACTLY `Control`. Inside, return a control (like a Panel, Grid or Border) that is or inherits from `Control`.)
+   - `public Control CreateView()` (THE RETURN TYPE MUST BE EXACTLY `Control`. Inside, return a control (like a Panel, Grid or Border) that is or inherits from `Control`.) EVERY code path inside this method MUST end in a `return` statement — never leave a branch (e.g. an empty-list check) without returning something.
+10. `ListBox` in this Avalonia version does NOT support several properties you might expect: no `SelectionMode.None` (only `Single`, `Multiple`, `Toggle`, `AlwaysSelected` exist), and NO `HorizontalContentAlignment` / `VerticalContentAlignment` directly on the `ListBox` itself (only settable per-item via a `ListBoxItem` style selector, which is unnecessary complexity here). To avoid this whole class of error: **for displaying static/read-only tabular or list data (e.g. a table of students, grades, classes), do NOT use `ListBox` at all.** Instead wrap a `StackPanel` (or `Grid` rows) in a `ScrollViewer` and add the rows manually in a `foreach` loop. Reserve `ListBox` ONLY for cases where the user must actually click/select one item from a list to trigger an action.
+11. KEEP THE CODE SHORT AND SIMPLE. Prefer the minimum amount of C# needed to satisfy the request (simple StackPanel/Grid layouts, no elaborate nested styling). Long, over-engineered responses are more likely to be cut off mid-generation and fail to compile — brevity is a correctness requirement here, not just a style preference.
+12. `Grid` has NO `Padding` property (only `Border`, `ContentControl`, and `Decorator`-derived controls have `Padding`). If a `Grid` needs inner spacing, wrap it in a `Border {{ Padding = ... }}` instead, or set `Margin` on the individual child elements. The same applies to `StackPanel` and other plain `Panel`-derived controls — they only support `Margin` on their children, never their own `Padding`.
 
 =========================================
 C# CLASS STRUCTURE BONES TEMPLATE:
@@ -287,6 +280,18 @@ SECURITY ENFORCEMENT & SHIELD (GUARDRAILS):
     ""handlerMethod"": ""using Avalonia.Controls;\nnamespace Kreta.Dynamic;\npublic class HibaView : UserControl, IEvolView {{\n    public string Name => \""Hiba\"";\n    public string Description => \""Hozzáférés megtagadva\"";\n    public Control CreateView() => new Label {{ Content = \""Hiba\"" }};\n}}"",
     ""runtimeScript"": ""DisplayText = \""Hiba: Nincs jogosultsága ehhez a művelethez!\"";""
   }}
+{(string.IsNullOrWhiteSpace(history) ? "" : $@"
+
+=========================================
+SELF-HEALING: AZ ELŐZŐ PRÓBÁLKOZÁSOD HIBÁS VOLT!
+=========================================
+A rendszer megpróbálta lefordítani/betölteni az előző válaszodat, de a következő hibát kapta:
+
+{history}
+
+Ez alapján generálj EGY TELJES, ÚJ, JAVÍTOTT megoldást, ami ezt a konkrét hibát kiküszöböli. Ha a hiba
+arra utal, hogy a válaszod félbeszakadt (pl. token-limit / hiányzó záró jelek / ""not all code paths
+return a value""), akkor most ÍRJ RÖVIDEBB, EGYSZERŰBB kódot, hogy biztosan elférjen egy válaszban.")}
 ";
 
         var payload = new
@@ -302,6 +307,7 @@ SECURITY ENFORCEMENT & SHIELD (GUARDRAILS):
             generationConfig = new
             {
                 responseMimeType = "application/json",
+                maxOutputTokens = 8192,
                 responseSchema = new
                 {
                     type = "OBJECT",
@@ -311,8 +317,6 @@ SECURITY ENFORCEMENT & SHIELD (GUARDRAILS):
                         description = new { type = "STRING" },
                         sourceCode = new { type = "STRING" },
                         testCode = new { type = "STRING" },
-
-                        // Opcionális mezők az RBAC elutasítás (REJECT) támogatásához
                         action = new { type = "STRING" },
                         handlerMethod = new { type = "STRING" }
                     },
@@ -346,15 +350,26 @@ SECURITY ENFORCEMENT & SHIELD (GUARDRAILS):
         try
         {
             using var doc = JsonDocument.Parse(responseString);
-            var responseText = doc.RootElement
-                .GetProperty("candidates")[0]
-                .GetProperty("content")
-                .GetProperty("parts")[0]
-                .GetProperty("text")
-                .GetString();
+            var candidate = doc.RootElement.GetProperty("candidates")[0];
+
+            string? finishReason = candidate.TryGetProperty("finishReason", out var fr) ? fr.GetString() : null;
+
+            var partsElement = candidate.GetProperty("content").GetProperty("parts");
+            var responseText = partsElement.GetArrayLength() > 0
+                ? partsElement[0].GetProperty("text").GetString()
+                : null;
 
             if (string.IsNullOrEmpty(responseText))
-                throw new Exception("Az AI üres választ adott vissza.");
+            {
+                if (finishReason == "MAX_TOKENS")
+                {
+                    throw new Exception(
+                        "A modell válasza megszakadt, mielőtt befejezte volna a kódot (token-limit). " +
+                        "Kérj egy egyszerűbb / kisebb funkciót, vagy próbáld újra.");
+                }
+
+                throw new Exception($"Az AI üres választ adott vissza (finishReason: {finishReason ?? "ismeretlen"}).");
+            }
 
             var cleanedJson = responseText.Trim();
             if (cleanedJson.StartsWith("```json"))
@@ -371,13 +386,11 @@ SECURITY ENFORCEMENT & SHIELD (GUARDRAILS):
             using var parsedResponse = JsonDocument.Parse(cleanedJson);
             var root = parsedResponse.RootElement;
 
-            // Ha az AI elutasította a kérést az RBAC szabályzat megsértése miatt
             if (root.TryGetProperty("action", out var actionProp) && actionProp.GetString() == "REJECT")
             {
                 Console.WriteLine(
                     "[RBAC Guardrail] Az AI elutasította a generálási kérést biztonsági szabályzat megsértése miatt.");
 
-                // Generálunk egy gyönyörű és biztonságosan leforduló Avalonia UI Hiba panelt
                 var safeHibaCode = @"using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -439,7 +452,6 @@ public class HibaView : UserControl, IEvolView
                 };
             }
 
-            // Normál visszatérési adatok beolvasása
             var result = JsonSerializer.Deserialize<AiEvolveResponse>(cleanedJson, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true

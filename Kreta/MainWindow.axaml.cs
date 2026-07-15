@@ -21,6 +21,11 @@ public partial class MainWindow : Window
     private readonly IEvolutionService _evolutionService;
     private readonly KretaDbContext _dbContext;
 
+    // Az önjavító (Self-Healing) ciklus maximális próbálkozásszáma — ha a fordítás
+    // elhasal, a hibaüzenet visszamegy az AI-nak javításra, legfeljebb ennyiszer,
+    // mielőtt a felhasználót zavarnánk vele. Lásd OnAiButtonClick.
+    private const int MaxSelfHealAttempts = 3;
+
     // Szimulált bejelentkezett diák, tanár és igazgató ID-ja
     private const int SimulatedStudentId = 1; // Kovács János
     private const int SimulatedTeacherId = 4; // Szabó Mária
@@ -262,7 +267,7 @@ public partial class MainWindow : Window
 
         try
         {
-            // Kontextus-érzékeny prompt összeállítása
+            // Kontextus-érzékeny prompt összeállítása (egyszer, a ciklus előtt)
             var roleContextName = $"I{_currentRole}Context";
             var contextualPrompt = $"Felhasználó szerepköre: {_currentRole}. " +
                                    $"Az elvárt modul leírása: {prompt}." +
@@ -272,70 +277,104 @@ public partial class MainWindow : Window
                                    $"\n3. Kizárólag a megadott {roleContextName} metódusait használd a mentésre és beolvasásra." +
                                    $"\n4. Építs fel egy szép Avalonia UI vezérlőt tiszta C# kóddal. Ha gombnyomás történik, ments el az adatokat és frissítsd a listákat.";
 
-            // 1. Az eredeti, 3-paraméteres interfész hívása
-            AiEvolveResponse response = await _aiService.GenerateFeatureAsync(contextualPrompt, _currentRole, null);
+            // Önjavító (Self-Healing) ciklus: ha a fordítás elhasal, a hibaüzenet
+            // visszamegy az AI-nak ('history' paraméterként), és újrapróbál —
+            // legfeljebb MaxSelfHealAttempts alkalommal, mielőtt feladná.
+            string? previousError = null;
 
-            // 2. Az eredeti, 4-paraméteres aszinkron fordítás hívása
-            var result = await _evolutionService.EvolveFeatureAsync(response.ViewName, response.Description, response.SourceCode, response.TestCode);
-
-            if (result.IsSuccess && result.CompiledAssembly != null)
+            for (int attempt = 1; attempt <= MaxSelfHealAttempts; attempt++)
             {
-                var newViewType = result.CompiledAssembly.GetTypes()
-                    .FirstOrDefault(t => typeof(IEvolView).IsAssignableFrom(t) && !t.IsInterface);
+                StatusText.Text = attempt == 1
+                    ? "🤖 AI kód generálása..."
+                    : $"🔁 Önjavítás ({attempt}. próbálkozás)...";
+                StatusText.Foreground = Brushes.Orange;
 
-                if (newViewType != null)
+                AiEvolveResponse response;
+                try
                 {
-                    var newViewInstance = InstantiateViewForRole(newViewType);
-                    if (newViewInstance != null)
-                    {
-                        // Hozzáadjuk az ideiglenesen lefordított listához
-                        _loadedViews.Add(newViewInstance);
-                        _viewSourceMap[newViewInstance] = response.SourceCode;
-
-                        RefreshSidebarMenu();
-                        NavigateToView(newViewInstance);
-
-                        ApproveButton.IsVisible = true;
-                        DiscardButton.IsVisible = true;
-                        StatusText.Text = "Sikeres generálás! Mentheti vagy elvetheti a módosítást.";
-                        StatusText.Foreground = Brushes.Green;
-                    }
+                    response = await _aiService.GenerateFeatureAsync(contextualPrompt, _currentRole, previousError);
                 }
-                else
+                catch (Exception ex)
                 {
-                    StatusText.Text = "A fordítás sikeres, de nem található IEvolView megvalósítás.";
+                    StatusText.Text = $"Hiba az AI hívás közben: {ex.Message}";
                     StatusText.Foreground = Brushes.Red;
+                    return;
                 }
-            }
-            else
-            {
-                StatusText.Text = "Fordítási hiba! Próbálja meg finomítani a promptot.";
 
-                // KIÍRÁS A KONZOLRA (terminálba) - GENERÁLT FORRÁSKÓD ÉS HIBAÜZENETEK IS!
+                var result = await _evolutionService.EvolveFeatureAsync(
+                    response.ViewName, response.Description, response.SourceCode, response.TestCode);
+
+                if (result.IsSuccess && result.CompiledAssembly != null)
+                {
+                    var newViewType = result.CompiledAssembly.GetTypes()
+                        .FirstOrDefault(t => typeof(IEvolView).IsAssignableFrom(t) && !t.IsInterface);
+
+                    if (newViewType != null)
+                    {
+                        var newViewInstance = InstantiateViewForRole(newViewType);
+                        if (newViewInstance != null)
+                        {
+                            _loadedViews.Add(newViewInstance);
+                            _viewSourceMap[newViewInstance] = response.SourceCode;
+
+                            RefreshSidebarMenu();
+                            NavigateToView(newViewInstance);
+
+                            ApproveButton.IsVisible = true;
+                            DiscardButton.IsVisible = true;
+                            StatusText.Text = attempt == 1
+                                ? "Sikeres generálás! Mentheti vagy elvetheti a módosítást."
+                                : $"Sikeres generálás {attempt}. próbálkozásra (önjavítás működött)! Mentheti vagy elvetheti.";
+                            StatusText.Foreground = Brushes.Green;
+                            return;
+                        }
+
+                        previousError =
+                            "A fordítás sikeres volt, de a generált osztályt nem sikerült példányosítani a kért " +
+                            $"'{roleContextName}' konstruktor-paraméterrel. Ellenőrizd, hogy a konstruktor pontosan " +
+                            "ezt az egy interfészt várja paraméterként, semmi mást.";
+                        continue;
+                    }
+
+                    previousError =
+                        "A fordítás sikeres volt, de a válaszban nem volt IEvolView-t megvalósító osztály. " +
+                        "Győződj meg róla, hogy pontosan egy nyilvános osztály implementálja az IEvolView interfészt.";
+                    continue;
+                }
+
+                // Fordítási hiba — naplózzuk a konzolra, és előkészítjük a hibát a következő próbálkozáshoz.
+                previousError = result.ErrorMessage;
+
                 Console.ForegroundColor = ConsoleColor.Cyan;
                 Console.WriteLine("\n========================================================================");
-                Console.WriteLine($"[GENERÁLT C# FORRÁSKÓD - {response.ViewName.ToUpper()}]");
+                Console.WriteLine($"[GENERÁLT C# FORRÁSKÓD - {response.ViewName.ToUpper()} - {attempt}. PRÓBÁLKOZÁS]");
                 Console.WriteLine("========================================================================");
                 Console.ForegroundColor = ConsoleColor.White;
                 Console.WriteLine(response.SourceCode);
-                
+
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine("========================================================================");
-                Console.WriteLine($"[FORDÍTÁSI HIBAÜZENETEK]");
+                Console.WriteLine($"[FORDÍTÁSI HIBAÜZENETEK - {attempt}. PRÓBÁLKOZÁS]");
                 Console.WriteLine("========================================================================");
                 Console.WriteLine(result.ErrorMessage);
                 Console.WriteLine("========================================================================\n");
                 Console.ResetColor();
 
-                MainContentArea.Content = new ScrollViewer
+                if (attempt == MaxSelfHealAttempts)
                 {
-                    Content = new TextBlock
+                    StatusText.Text = $"Fordítási hiba {MaxSelfHealAttempts} önjavító próbálkozás után is. Próbálja finomítani a promptot.";
+                    StatusText.Foreground = Brushes.Red;
+
+                    MainContentArea.Content = new ScrollViewer
                     {
-                        Text = $"Fordítási hibák listája:\n{result.ErrorMessage}",
-                        Foreground = Brushes.Red,
-                        Margin = new Avalonia.Thickness(10)
-                    }
-                };
+                        Content = new TextBlock
+                        {
+                            Text = $"Fordítási hibák listája ({MaxSelfHealAttempts} próbálkozás után):\n{result.ErrorMessage}",
+                            Foreground = Brushes.Red,
+                            Margin = new Avalonia.Thickness(10)
+                        }
+                    };
+                }
             }
         }
         catch (Exception ex)
