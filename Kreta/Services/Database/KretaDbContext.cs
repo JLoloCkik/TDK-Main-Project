@@ -1,53 +1,53 @@
-using System;
-using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using Kreta.Core;
+using System;
+using System.Linq;
 
 namespace Kreta.Services.Database;
 
 public class KretaDbContext : DbContext
 {
-    public DbSet<User> Users { get; set; }
-    public DbSet<Grade> Grades { get; set; }
-    public DbSet<Subject> Subjects { get; set; }
-    
+    public DbSet<User> Users => Set<User>();
+    public DbSet<Subject> Subjects => Set<Subject>();
+    public DbSet<Grade> Grades => Set<Grade>();
+    public DbSet<Lesson> Lessons => Set<Lesson>();
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
-        // Abszolút útvonalat használunk a projekt gyökeréhez képest, hogy
-        // ne jöjjön létre több, egymástól eltérő kreta.db fájl attól függően,
-        // honnan indítjuk az alkalmazást (ez korábban valódi hiba volt).
-        string? root = Kreta.Services.PathHelper.FindProjectRoot();
-        string dbPath = root != null
-            ? System.IO.Path.Combine(root, "kreta.db")
-            : "kreta.db";
-
-        optionsBuilder.UseSqlite($"Data Source={dbPath}");
+        optionsBuilder.UseSqlite("Data Source=evol_kreta.db");
     }
 
-    public void Seed()
+    public void SeedData()
     {
         Database.EnsureCreated();
 
         if (!Users.Any())
         {
-            var student = new User { Name = "Kovács János", Email = "janos@evolkréta.hu", Role = Role.Student };
-            var teacher = new User { Name = "Szabó Mária", Email = "maria@evolkréta.hu", Role = Role.Teacher };
-            var director = new User { Name = "Nagy Péter", Email = "peter@evolkréta.hu", Role = Role.Director };
+            var student1 = new User { Name = "Kovács János", Role = Role.Student, ClassName = "9.A" };
+            var student2 = new User { Name = "Németh Alíz", Role = Role.Student, ClassName = "9.A" };
+            var student3 = new User { Name = "Kiss Bence", Role = Role.Student, ClassName = "10.B" };
+            var teacher = new User { Name = "Szabó Mária", Role = Role.Teacher, ClassName = "" };
+            var director = new User { Name = "Nagy Péter", Role = Role.Director, ClassName = "" };
 
-            Users.AddRange(student, teacher, director);
-            
-            var math = new Subject { Name = "Matematika" };
-            var history = new Subject { Name = "Történelem" };
-            
-            Subjects.AddRange(math, history);
+            Users.AddRange(student1, student2, student3, teacher, director);
+            SaveChanges();
 
-            SaveChanges(); 
-            
-            var grade1 = new Grade { Value = 5, Weight = 100, Date = DateTime.Now.AddDays(-2), StudentId = student.Id, SubjectId = math.Id };
-            var grade2 = new Grade { Value = 4, Weight = 100, Date = DateTime.Now.AddDays(-1), StudentId = student.Id, SubjectId = math.Id };
-            var grade3 = new Grade { Value = 3, Weight = 50, Date = DateTime.Now, StudentId = student.Id, SubjectId = history.Id };
-            
-            Grades.AddRange(grade1, grade2, grade3);
+            var subMat = new Subject { Name = "Matematika" };
+            var subLit = new Subject { Name = "Magyar nyelv és irodalom" };
+            var subHis = new Subject { Name = "Történelem" };
+            Subjects.AddRange(subMat, subLit, subHis);
+            SaveChanges();
+
+            Grades.AddRange(
+                new Grade { StudentId = student1.Id, SubjectId = subMat.Id, Value = 5, Date = DateTime.Now.AddDays(-3) },
+                new Grade { StudentId = student1.Id, SubjectId = subLit.Id, Value = 4, Date = DateTime.Now.AddDays(-1) },
+                new Grade { StudentId = student2.Id, SubjectId = subMat.Id, Value = 3, Date = DateTime.Now.AddDays(-2) }
+            );
+
+            Lessons.AddRange(
+                new Lesson { ClassName = "9.A", SubjectName = "Matematika", Room = "101-es terem", Date = DateTime.Now.AddHours(2) },
+                new Lesson { ClassName = "9.A", SubjectName = "Történelem", Room = "204-es terem", Date = DateTime.Now.AddHours(4) }
+            );
 
             SaveChanges();
         }

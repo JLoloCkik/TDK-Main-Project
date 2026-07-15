@@ -1,323 +1,322 @@
 using System;
 using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
-using Avalonia;
+using System.Collections.Generic;
+using Avalonia; // CornerRadius feloldásához szükséges
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using Microsoft.EntityFrameworkCore;
+using Avalonia.Layout;
+using Avalonia.Media;
 using Kreta.Core;
 using Kreta.Contexts;
-using Kreta.Services;
 using Kreta.Services.AI;
 using Kreta.Services.Database;
 using Kreta.Services.Evolution;
-using Kreta.Services.Git;
-using Kreta.Services.Security;
 
 namespace Kreta;
 
 public partial class MainWindow : Window
 {
-    private const int MaxSelfHealAttempts = 3;
-
-    private AiEvolveResponse? _pendingResponse;
-
-    // Ez NEM a régi, egyszer-példányosított _loader többé: minden új
-    // generáláskor friss DynamicLoader (= friss ALC) jön létre, a régit
-    // előtte leállítjuk. Lásd DynamicLoader.cs megjegyzését.
-    private IDynamicLoader? _currentLoader;
-
-    private readonly IGitService _gitService;
-    private readonly IEvolutionService _evolutionService;
     private readonly IAiService _aiService;
-    private readonly AstAnalyzer _astAnalyzer;
+    private readonly IEvolutionService _evolutionService;
+    private readonly KretaDbContext _dbContext;
+
+    // Szimulált bejelentkezett diák, tanár és igazgató ID-ja
+    private const int SimulatedStudentId = 1; // Kovács János
+    private const int SimulatedTeacherId = 4; // Szabó Mária
+    private const int SimulatedDirectorId = 5; // Nagy Péter
+
+    private Role _currentRole = Role.Student;
+    
+    // Az összes betöltött modul forráskódja és példánya
+    private readonly List<IEvolView> _loadedViews = new();
+    private readonly Dictionary<IEvolView, string> _viewSourceMap = new();
+    private readonly string _evolViewsDirectory;
 
     public MainWindow()
     {
         InitializeComponent();
 
-        _gitService = new GitService();
-        _evolutionService = new EvolutionService();
-        _aiService = new AiService();
-        _astAnalyzer = new AstAnalyzer();
-
-        using (var db = new KretaDbContext())
+        _evolViewsDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "EvolViews");
+        if (!Directory.Exists(_evolViewsDirectory))
         {
-            db.Seed();
+            Directory.CreateDirectory(_evolViewsDirectory);
         }
 
-        LoadEnvironment();
-        UpdateEvolverStatus();
+        // Adatbázis inicializálás és seeding
+        _dbContext = new KretaDbContext();
+        _dbContext.SeedData();
 
-        AiButton.Click += OnAiClick;
-        ApproveButton.Click += OnApproveClick;
-        DiscardButton.Click += OnDiscardClick;
-        RoleSelector.SelectionChanged += OnRoleSelectionChanged;
+        _aiService = new AiService();
+        _evolutionService = new EvolutionService();
 
-        TriggerInitialRoleLoad();
+        // UI Eseménykezelők
+        AiButton.Click += OnAiButtonClick;
+        ApproveButton.Click += OnApproveButtonClick;
+        DiscardButton.Click += OnDiscardButtonClick;
+        RoleSelector.SelectionChanged += OnRoleChanged;
+        
+        // Mentett fájlok betöltése és fordítása indításkor
+        BootAndCompileSavedModules();
+        RefreshSidebarMenu();
     }
 
-    private void TriggerInitialRoleLoad()
+    private void OnRoleChanged(object? sender, SelectionChangedEventArgs e)
     {
-        OnRoleSelectionChanged(null, null!);
+        if (RoleSelector.SelectedItem is ComboBoxItem item && item.Tag is string roleStr)
+        {
+            if (Enum.TryParse<Role>(roleStr, out var role))
+            {
+                _currentRole = role;
+                MainContentArea.Content = new StackPanel
+                {
+                    VerticalAlignment = VerticalAlignment.Center,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Spacing = 10,
+                    Children = 
+                    {
+                        new TextBlock
+                        {
+                            Text = $"Sikeresen átváltott a(z) {role} szerepkörre!",
+                            FontSize = 16,
+                            FontWeight = FontWeight.Bold,
+                            Foreground = new SolidColorBrush(Color.Parse("#2C3E50")),
+                            HorizontalAlignment = HorizontalAlignment.Center
+                        },
+                        new TextBlock
+                        {
+                            Text = "Válasszon egy hozzárendelt funkciót az oldalsávról.",
+                            FontSize = 12,
+                            Foreground = Brushes.Gray,
+                            HorizontalAlignment = HorizontalAlignment.Center
+                        }
+                    }
+                };
+                RefreshSidebarMenu();
+            }
+        }
     }
 
-    private void LoadEnvironment()
+    private async void BootAndCompileSavedModules()
     {
         try
         {
-            // A .env-et a projekt gyökeréből töltjük be (nem a CWD-ből!),
-            // mert a CWD az indítás módjától függően más és más lehet.
-            string? root = PathHelper.FindProjectRoot();
-            string envPath = root != null ? Path.Combine(root, ".env") : ".env";
+            var files = Directory.GetFiles(_evolViewsDirectory, "*.cs");
+            if (files.Length == 0) return;
 
-            if (File.Exists(envPath))
+            StatusText.Text = $"{files.Length} korábbi modul betöltése és fordítása...";
+            StatusText.Foreground = Brushes.Orange;
+
+            int loadedCount = 0;
+            foreach (var file in files)
             {
-                DotNetEnv.Env.Load(envPath);
-            }
-            else
-            {
-                // Végső próbálkozás: hátha mégis az aktuális könyvtárban van.
-                DotNetEnv.Env.Load();
+                var sourceCode = File.ReadAllText(file);
+                var viewName = Path.GetFileNameWithoutExtension(file);
+
+                // Meglévő, gyári aszinkron EvolveFeatureAsync hívása egyenként
+                var result = await _evolutionService.EvolveFeatureAsync(viewName, "Mentett modul", sourceCode, "");
+
+                if (result.IsSuccess && result.CompiledAssembly != null)
+                {
+                    var viewTypes = result.CompiledAssembly.GetTypes()
+                        .Where(t => typeof(IEvolView).IsAssignableFrom(t) && !t.IsInterface);
+
+                    foreach (var type in viewTypes)
+                    {
+                        var instance = InstantiateViewForRole(type);
+                        if (instance != null)
+                        {
+                            _loadedViews.Add(instance);
+                            loadedCount++;
+                        }
+                    }
+                }
             }
 
-            var key = Environment.GetEnvironmentVariable("GEMINI_API_KEY");
-
-            if (string.IsNullOrWhiteSpace(key))
-                SetStatus($"⚠️ GEMINI_API_KEY hiányzik! Keresett hely: {envPath}", isError: true);
-            else
-                SetStatus("✅ API kulcs betöltve. Írj be egy kérést, majd kattints a 🤖 Fejlesztés gombra.");
+            StatusText.Text = $"{loadedCount} modul sikeresen betöltve a lemezről.";
+            StatusText.Foreground = Brushes.Green;
+            RefreshSidebarMenu();
         }
         catch (Exception ex)
         {
-            SetStatus($".env betöltési hiba: {ex.Message}", isError: true);
+            StatusText.Text = $"Rendszerindítási hiba: {ex.Message}";
+            StatusText.Foreground = Brushes.Red;
         }
     }
 
-    private void UpdateEvolverStatus()
+    private IEvolView? InstantiateViewForRole(Type viewType)
     {
-        EvolverStatusText.Text = "🟢 Self-evolving: AKTÍV (Azonnali RAM + Háttér mentés)";
-    }
-
-    private void SetStatus(string message, bool isError = false)
-    {
-        StatusText.Text = message;
-        StatusText.Foreground = isError ? Avalonia.Media.Brushes.OrangeRed : Avalonia.Media.Brushes.Gray;
-    }
-
-    private void SetBusy(bool busy)
-    {
-        AiButton.IsEnabled = !busy;
-        PromptInput.IsEnabled = !busy;
-        RoleSelector.IsEnabled = !busy;
-        BusyIndicator.IsVisible = busy;
-    }
-
-    private void OnRoleSelectionChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        if (RoleSelector == null || MainContentArea == null) return;
-
-        var selectedItem = RoleSelector.SelectedItem as ComboBoxItem;
-        if (selectedItem == null) return;
-
-        string roleString = selectedItem.Tag?.ToString() ?? "Student";
-        Role selectedRole = Enum.Parse<Role>(roleString);
-
-        using var db = new KretaDbContext();
-
-        if (selectedRole == Role.Student)
+        try
         {
-            var studentContext = new SqliteStudentContext(db, 1);
-            var profile = studentContext.GetMyProfile();
-            var grades = studentContext.GetMyGrades();
-
-            if (profile != null)
+            var constructors = viewType.GetConstructors();
+            
+            // Megkeressük, milyen interfészt vár a konstruktor
+            foreach (var ctor in constructors)
             {
-                string gradesLines = string.Join("\n", grades.Select(g =>
-                    $"• {g.Subject.Name}: {g.Value} (Súly: {g.Weight}%) - {g.Date:yyyy.MM.dd.}"));
+                var parameters = ctor.GetParameters();
+                if (parameters.Length == 1)
+                {
+                    var paramType = parameters[0].ParameterType;
 
-                MainContentArea.Content = BuildProfileCard(
-                    "👨‍🎓", profile.Name, profile.Role.ToString(), profile.Email,
-                    "📚 Osztályzatok:", gradesLines);
+                    if (paramType == typeof(IStudentContext))
+                    {
+                        var context = new SqliteStudentContext(_dbContext, SimulatedStudentId);
+                        return (IEvolView?)Activator.CreateInstance(viewType, context);
+                    }
+                    if (paramType == typeof(ITeacherContext))
+                    {
+                        var context = new SqliteTeacherContext(_dbContext);
+                        return (IEvolView?)Activator.CreateInstance(viewType, context);
+                    }
+                    if (paramType == typeof(IDirectorContext))
+                    {
+                        var context = new SqliteDirectorContext(_dbContext);
+                        return (IEvolView?)Activator.CreateInstance(viewType, context);
+                    }
+                }
+            }
+
+            // Fallback üres konstruktorhoz
+            return (IEvolView?)Activator.CreateInstance(viewType);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private void RefreshSidebarMenu()
+    {
+        SidebarMenuPanel.Children.Clear();
+
+        foreach (var view in _loadedViews)
+        {
+            // Konstruktor ellenőrzéssel kiszűrjük a megfelelő szerepköröket
+            var constructors = view.GetType().GetConstructors();
+            bool isStudentView = constructors.Any(c => c.GetParameters().Any(p => p.ParameterType == typeof(IStudentContext)));
+            bool isTeacherView = constructors.Any(c => c.GetParameters().Any(p => p.ParameterType == typeof(ITeacherContext)));
+            bool isDirectorView = constructors.Any(c => c.GetParameters().Any(p => p.ParameterType == typeof(IDirectorContext)));
+
+            bool isVisible = false;
+            if (_currentRole == Role.Student && isStudentView) isVisible = true;
+            if (_currentRole == Role.Teacher && isTeacherView) isVisible = true;
+            if (_currentRole == Role.Director && isDirectorView) isVisible = true;
+
+            if (isVisible)
+            {
+                var btn = new Button
+                {
+                    Content = $"🔹 {view.Name}",
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    Margin = new Avalonia.Thickness(0, 0, 0, 4),
+                    Padding = new Avalonia.Thickness(12, 10),
+                    Background = new SolidColorBrush(Color.Parse("#2C3E50")),
+                    Foreground = Brushes.White,
+                    CornerRadius = new CornerRadius(6)
+                };
+                
+                btn.Click += (s, e) => NavigateToView(view);
+                SidebarMenuPanel.Children.Add(btn);
             }
         }
-        else if (selectedRole == Role.Teacher)
-        {
-            var teacher = db.Users.FirstOrDefault(u => u.Id == 2);
+    }
 
-            if (teacher != null)
-            {
-                MainContentArea.Content = BuildProfileCard(
-                    "👩‍🏫", teacher.Name, teacher.Role.ToString(), teacher.Email,
-                    "🛠️ Engedélyezett műveletek:",
-                    "• Osztályzatok beírása és törlése\n• Osztály-statisztikák lekérése\n• Házi feladatok rögzítése");
-            }
+    private void NavigateToView(IEvolView view)
+    {
+        try
+        {
+            MainContentArea.Content = view.CreateView();
+            StatusText.Text = $"Aktív modul: {view.Name}";
+            StatusText.Foreground = Brushes.Green;
         }
-        else if (selectedRole == Role.Director)
+        catch (Exception ex)
         {
-            var director = db.Users.FirstOrDefault(u => u.Id == 3);
-
-            if (director != null)
+            MainContentArea.Content = new ScrollViewer
             {
-                MainContentArea.Content = BuildProfileCard(
-                    "👑", director.Name, director.Role.ToString(), director.Email,
-                    "🛠️ Rendszergazdai műveletek:",
-                    "• Globális iskolai naptár és órarend módosítása\n• Új tantárgyak, osztályok és versenyek létrehozása\n• Felhasználók (Tanárok, Diákok) kezelése");
-            }
+                Content = new TextBlock
+                {
+                    Text = $"Hiba a nézet kirajzolásakor:\n{ex.Message}\n\n{ex.StackTrace}",
+                    Foreground = Brushes.Red,
+                    Margin = new Avalonia.Thickness(10)
+                }
+            };
         }
     }
 
-    private static Control BuildProfileCard(string emoji, string name, string role, string email, string sectionTitle, string sectionBody)
+    private async void OnAiButtonClick(object? sender, RoutedEventArgs e)
     {
-        var panel = new StackPanel { Spacing = 4, Margin = new Thickness(4) };
-
-        panel.Children.Add(new TextBlock
-        {
-            Text = $"{emoji} Bejelentkezve: {name} ({role})",
-            FontSize = 16,
-            FontWeight = Avalonia.Media.FontWeight.SemiBold,
-            Foreground = Avalonia.Media.Brush.Parse("#2C3E50")
-        });
-
-        panel.Children.Add(new TextBlock
-        {
-            Text = $"📧 {email}",
-            FontSize = 13,
-            Foreground = Avalonia.Media.Brush.Parse("#7F8C8D"),
-            Margin = new Thickness(0, 0, 0, 12)
-        });
-
-        panel.Children.Add(new TextBlock
-        {
-            Text = sectionTitle,
-            FontSize = 14,
-            FontWeight = Avalonia.Media.FontWeight.SemiBold,
-            Foreground = Avalonia.Media.Brush.Parse("#34495E"),
-            Margin = new Thickness(0, 0, 0, 4)
-        });
-
-        panel.Children.Add(new TextBlock
-        {
-            Text = sectionBody,
-            FontSize = 14,
-            LineHeight = 22,
-            Foreground = Avalonia.Media.Brush.Parse("#2C3E50")
-        });
-
-        return new Border
-        {
-            Background = Avalonia.Media.Brushes.White,
-            CornerRadius = new CornerRadius(10),
-            Padding = new Thickness(20),
-            BoxShadow = Avalonia.Media.BoxShadows.Parse("0 2 8 0 #14000000"),
-            Child = panel,
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch,
-            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top
-        };
-    }
-
-private async void OnAiClick(object? sender, RoutedEventArgs e)
-    {
-        string prompt = PromptInput.Text ?? "";
-        if (string.IsNullOrWhiteSpace(prompt))
-        {
-            StatusText.Text = "⚠️ Írj be egy kérést a fejlesztéshez!";
-            return;
-        }
+        var prompt = PromptInput.Text;
+        if (string.IsNullOrWhiteSpace(prompt)) return;
 
         SetBusy(true);
-
-        string dllPath = Path.Combine(AppContext.BaseDirectory, "Dynamic", "DynamicFeatures.dll");
-
-        var selectedItem = RoleSelector.SelectedItem as ComboBoxItem;
-        string roleString = selectedItem?.Tag?.ToString() ?? "Student";
-        Role currentRole = Enum.Parse<Role>(roleString);
-
-        string? feedback = null;
+        ApproveButton.IsVisible = false;
+        DiscardButton.IsVisible = false;
 
         try
         {
-            for (int attempt = 1; attempt <= MaxSelfHealAttempts; attempt++)
+            // Kontextus-érzékeny prompt összeállítása
+            var roleContextName = $"I{_currentRole}Context";
+            var contextualPrompt = $"Felhasználó szerepköre: {_currentRole}. " +
+                                   $"Az elvárt modul leírása: {prompt}." +
+                                   $"\n\nFONTOS TECHNIKAI SZABÁLYOK:" +
+                                   $"\n1. Az osztály neve legyen egyedi (pl. MyFeature_{Guid.NewGuid():N}.cs)." +
+                                   $"\n2. KÖTELEZŐEN a konstruktorában kérje be a '{roleContextName}' interfészt!" +
+                                   $"\n3. Kizárólag a megadott {roleContextName} metódusait használd a mentésre és beolvasásra." +
+                                   $"\n4. Építs fel egy szép Avalonia UI vezérlőt tiszta C# kóddal. Ha gombnyomás történik, ments el az adatokat és frissítsd a listákat.";
+
+            // 1. Az eredeti, 3-paraméteres interfész hívása
+            AiEvolveResponse response = await _aiService.GenerateFeatureAsync(contextualPrompt, _currentRole, null);
+
+            // 2. Az eredeti, 4-paraméteres aszinkron fordítás hívása
+            var result = await _evolutionService.EvolveFeatureAsync(response.ViewName, response.Description, response.SourceCode, response.TestCode);
+
+            if (result.IsSuccess && result.CompiledAssembly != null)
             {
-                StatusText.Text = attempt == 1
-                    ? "🤖 AI kód generálása..."
-                    : $"🔁 Önjavítás ({attempt}. próbálkozás)...";
+                var newViewType = result.CompiledAssembly.GetTypes()
+                    .FirstOrDefault(t => typeof(IEvolView).IsAssignableFrom(t) && !t.IsInterface);
 
-                AiEvolveResponse aiResponse;
-                try
+                if (newViewType != null)
                 {
-                    aiResponse = await _aiService.GenerateFeatureAsync(prompt, currentRole, feedback);
+                    var newViewInstance = InstantiateViewForRole(newViewType);
+                    if (newViewInstance != null)
+                    {
+                        // Hozzáadjuk az ideiglenesen lefordított listához
+                        _loadedViews.Add(newViewInstance);
+                        _viewSourceMap[newViewInstance] = response.SourceCode;
+
+                        RefreshSidebarMenu();
+                        NavigateToView(newViewInstance);
+
+                        ApproveButton.IsVisible = true;
+                        DiscardButton.IsVisible = true;
+                        StatusText.Text = "Sikeres generálás! Mentheti vagy elvetheti a módosítást.";
+                        StatusText.Foreground = Brushes.Green;
+                    }
                 }
-                catch (Exception ex)
+                else
                 {
-                    StatusText.Text = $"❌ AI hiba: {ex.Message}";
-                    return;
+                    StatusText.Text = "A fordítás sikeres, de nem található IEvolView megvalósítás.";
+                    StatusText.Foreground = Brushes.Red;
                 }
-
-                if (string.Equals(aiResponse.Action, "REJECT", StringComparison.OrdinalIgnoreCase))
-                {
-                    StatusText.Text = $"🚫 A kérés elutasítva: {aiResponse.Label}";
-                    return;
-                }
-
-                _pendingResponse = aiResponse;
-
-                // DIAGNOSZTIKA: Kiírjuk a terminálba a kapott kódot!
-                Console.WriteLine($"\n================ PRÓBÁLKOZÁS {attempt} ================");
-                Console.WriteLine($"[GENERÁLT KÓD]:\n{aiResponse.HandlerMethod}\n");
-
-                if (!_astAnalyzer.IsSafe(aiResponse.HandlerMethod, currentRole, out string reason))
-                {
-                    feedback = $"Biztonsági szűrő elutasította a kódot: {reason} " +
-                               "Írj olyan kódot, ami nem sérti a jogosultsági szabályokat, és nem használ tiltott API-kat!";
-                    StatusText.Text = $"🚨 Biztonsági riasztás: {reason}";
-                    
-                    // DIAGNOSZTIKA: Tűzfal hiba
-                    Console.WriteLine($"[🔥 TŰZFAL BLOKKOLTA]: {reason}");
-                    Console.WriteLine("==================================================\n");
-                    continue;
-                }
-
-                var buildResult = await _evolutionService.EvolveFeatureAsync(
-                    aiResponse.HandlerName, aiResponse.Label, aiResponse.HandlerMethod, "");
-
-                if (!buildResult.IsSuccess)
-                {
-                    feedback = buildResult.Message;
-                    StatusText.Text = $"⚠️ Fordítási hiba ({attempt}. próbálkozás) — önjavítás indul...";
-                    
-                    // DIAGNOSZTIKA: Fordítási hiba
-                    Console.WriteLine($"[💥 FORDÍTÁSI HIBA]:\n{buildResult.Message}");
-                    Console.WriteLine("==================================================\n");
-                    continue;
-                }
-
-                // Előző generálás ALC-jét leállítjuk, csak UTÁNA hozunk létre újat.
-                _currentLoader?.UnloadAssembly();
-                _currentLoader = new DynamicLoader();
-
-                var views = _currentLoader.GetViewsFromAssembly(dllPath);
-                var loadedView = views.FirstOrDefault();
-
-                if (loadedView is Control control)
-                {
-                    MainContentArea.Content = control;
-                    ApproveButton.IsVisible = true;
-                    DiscardButton.IsVisible = true;
-                    StatusText.Text = "⚡ RAM Preview aktív. Kérlek hagyd jóvá vagy vesd el!";
-                    
-                    Console.WriteLine("[✅ SIKERES FORDÍTÁS ÉS MEGJELENÍTÉS!]");
-                    Console.WriteLine("==================================================\n");
-                    return;
-                }
-
-                StatusText.Text = "❌ A generált DLL nem tartalmazott érvényes, megjeleníthető nézetet.";
-                Console.WriteLine("[❌ HIBA]: A DLL-ben nem volt Control-ból öröklődő IEvolView!");
-                return;
             }
-
-            StatusText.Text = $"❌ Nem sikerült {MaxSelfHealAttempts} próbálkozás alatt sem hibátlan kódot generálni.";
+            else
+            {
+                StatusText.Text = "Fordítási hiba! Próbálja meg finomítani a promptot.";
+                MainContentArea.Content = new ScrollViewer
+                {
+                    Content = new TextBlock
+                    {
+                        Text = $"Fordítási hibák listája:\n{result.ErrorMessage}",
+                        Foreground = Brushes.Red,
+                        Margin = new Avalonia.Thickness(10)
+                    }
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Hiba történt: {ex.Message}";
+            StatusText.Foreground = Brushes.Red;
         }
         finally
         {
@@ -325,54 +324,66 @@ private async void OnAiClick(object? sender, RoutedEventArgs e)
         }
     }
 
-    private void OnApproveClick(object? sender, RoutedEventArgs e)
+    private void OnApproveButtonClick(object? sender, RoutedEventArgs e)
     {
-        if (_pendingResponse == null) return;
+        if (_loadedViews.Count == 0) return;
 
-        try
+        var lastView = _loadedViews.Last();
+        if (_viewSourceMap.TryGetValue(lastView, out var sourceCode))
         {
-            _gitService.Commit($"EvolKréta: Új ablak hozzáadva ({_pendingResponse.Label})");
-            StatusText.Text = $"💾 '{_pendingResponse.Label}' sikeresen rögzítve a Git verziókezelőben!";
-        }
-        catch (Exception ex)
-        {
-            StatusText.Text = $"⚠️ Git commit hiba: {ex.Message}";
-        }
+            try
+            {
+                // Elmentjük végleges fájlként a lemezre, hogy indításkor is betöltődjön
+                var fileName = $"EvolView_{lastView.GetType().Name}.cs";
+                var filePath = Path.Combine(_evolViewsDirectory, fileName);
+                File.WriteAllText(filePath, sourceCode);
 
-        ApproveButton.IsVisible = false;
-        DiscardButton.IsVisible = false;
-        AiButton.IsEnabled = true;
-        PromptInput.Text = "";
-        _pendingResponse = null;
+                StatusText.Text = $"Modul ({lastView.Name}) elmentve és rögzítve az iskolarendszerbe.";
+                StatusText.Foreground = Brushes.Green;
+
+                ApproveButton.IsVisible = false;
+                DiscardButton.IsVisible = false;
+                PromptInput.Text = "";
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text = $"Hiba a mentés során: {ex.Message}";
+                StatusText.Foreground = Brushes.Red;
+            }
+        }
     }
 
-    private void OnDiscardClick(object? sender, RoutedEventArgs e)
+    private void OnDiscardButtonClick(object? sender, RoutedEventArgs e)
     {
-        MainContentArea.Content = new TextBlock
+        if (_loadedViews.Count > 0)
         {
-            Text = "Fejlesztés elvetve.",
-            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
-            Foreground = Avalonia.Media.Brush.Parse("#7F8C8D")
-        };
+            var lastView = _loadedViews.Last();
+            _loadedViews.Remove(lastView);
+            _viewSourceMap.Remove(lastView);
 
-        _currentLoader?.UnloadAssembly();
-        _currentLoader = null;
+            RefreshSidebarMenu();
 
-        try
-        {
-            _gitService.RevertToLastStable();
+            MainContentArea.Content = new TextBlock
+            {
+                Text = "Generált modul sikeresen elvetve.",
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Foreground = Brushes.Gray
+            };
+
+            StatusText.Text = "Változtatások elvetve.";
+            StatusText.Foreground = Brushes.Orange;
+
+            ApproveButton.IsVisible = false;
+            DiscardButton.IsVisible = false;
         }
-        catch (Exception ex)
-        {
-            StatusText.Text = $"⚠️ Visszaállítási hiba: {ex.Message}";
-        }
+    }
 
-        ApproveButton.IsVisible = false;
-        DiscardButton.IsVisible = false;
-        AiButton.IsEnabled = true;
-        _pendingResponse = null;
-
-        StatusText.Text = "❌ Változtatások elvetve, a rendszer az utolsó stabil állapotban van.";
+    private void SetBusy(bool isBusy)
+    {
+        BusyIndicator.IsVisible = isBusy;
+        PromptInput.IsEnabled = !isBusy;
+        AiButton.IsEnabled = !isBusy;
+        RoleSelector.IsEnabled = !isBusy;
     }
 }

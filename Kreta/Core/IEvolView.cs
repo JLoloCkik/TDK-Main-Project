@@ -1,6 +1,10 @@
+using Avalonia.Controls;
+
 namespace Kreta.Core;
 
-public interface IEvolView {
-    string ViewName { get; }
-    Role RequiredRole { get; }
+public interface IEvolView
+{
+    string Name { get; }
+    string Description { get; }
+    Control CreateView();
 }

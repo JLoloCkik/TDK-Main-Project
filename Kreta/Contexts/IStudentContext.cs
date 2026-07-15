@@ -7,4 +7,5 @@ public interface IStudentContext
 {
     List<Grade> GetMyGrades();
     User? GetMyProfile();
+    List<Lesson> GetMyLessons();
 }

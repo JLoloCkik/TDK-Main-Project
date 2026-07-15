@@ -1,10 +1,9 @@
 namespace Kreta.Services.AI;
 
-public record AiEvolveResponse(
-    string Action,
-    string Target,
-    string Label,
-    string HandlerName,
-    string HandlerMethod,
-    string RuntimeScript
-);
+public class AiEvolveResponse
+{
+    public string ViewName { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public string SourceCode { get; set; } = string.Empty;
+    public string TestCode { get; set; } = string.Empty;
+}
