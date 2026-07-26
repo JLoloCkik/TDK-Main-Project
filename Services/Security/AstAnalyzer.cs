@@ -5,6 +5,9 @@ using System.Linq;
 
 namespace Kreta.Services.Security;
 
+/// <summary>
+/// Statikus AST elemző a tiltott/veszélyes metódushívások felderítésére.
+/// </summary>
 public class AstAnalyzer
 {
     public bool IsCodeSafe(string sourceCode, out string violation)

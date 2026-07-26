@@ -32,7 +32,6 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="Dynamic\" />
       <Folder Include="ViewModels\" />
       <Folder Include="Views\" />
     </ItemGroup>

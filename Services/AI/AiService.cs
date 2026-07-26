@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -9,11 +8,14 @@ using Kreta.Core;
 
 namespace Kreta.Services.AI;
 
+/// <summary>
+/// Gemini API kapcsolatot és C# UI kódgenerálást végző szolgáltatás.
+/// </summary>
 public class AiService : IAiService
 {
     private readonly HttpClient _httpClient;
 
-    // Statikusan tároljuk a legutóbb sikeresen működő verziót és modellt
+    // Statikusan tároljuk a legutóbb működő modellt, hogy a következő kérésnél azonnal ezzel indítsunk!
     private static string? _preferredVersion;
     private static string? _preferredModel;
 
@@ -45,7 +47,7 @@ public class AiService : IAiService
             }
             catch
             {
-                // DotNetEnv nincs konfigurálva vagy üres
+                // DotNetEnv nincs konfigurálva
             }
         }
 
@@ -76,6 +78,8 @@ public class AiService : IAiService
         };
 
         var fallbackMatrix = new List<dynamic>();
+
+        // 1. Ha már van bevált működő modellünk, az kerül a lista legelejére
         if (!string.IsNullOrEmpty(_preferredVersion) && !string.IsNullOrEmpty(_preferredModel))
         {
             fallbackMatrix.Add(new { Version = _preferredVersion, Model = _preferredModel });
@@ -112,6 +116,7 @@ public class AiService : IAiService
 
                     var response = await CallGeminiApiInternalAsync(prompt, role, history, apiKey, (string)attempt.Version, (string)attempt.Model);
                     
+                    // Megjegyezzük a sikeres típust
                     _preferredVersion = attempt.Version;
                     _preferredModel = attempt.Model;
 
@@ -226,19 +231,19 @@ ROLE-BASED ACCESS CONTROL (RBAC) MATRIX:
      * ANY reference to 'ITeacherContext' or 'IDirectorContext' is a critical security breach.
 
 =========================================
-CRITICAL C# COMPILATION RULES (VIOLATION WILL BREAK THE BUILD):
+CRITICAL C# & AVALONIA COMPILATION RULES (STRICT COMPLIANCE REQUIRED):
 =========================================
-1. NO TOP-LEVEL STATEMENTS: Do NOT write code outside of class structures. Absolutely everything must reside within standard class declarations, properties, constructors, or methods. No loose statements in the file!
-2. NO 'Student' TYPE: There is NO 'Student' class. Students are represented by the 'User' class where 'user.Role == Role.Student'.
-3. NO 'Weight' PROPERTY: Do NOT reference 'grade.Weight' or 'Weight' on the Grade class.
-4. ABSOLUTELY NO DATAGRID: The Avalonia DataGrid NuGet package is NOT referenced in this project.
+1. NO TOP-LEVEL STATEMENTS: Everything must reside inside class declarations.
+2. NO 'Student' TYPE: Use 'User' where 'user.Role == Role.Student'.
+3. NO 'Weight' PROPERTY on Grade.
+4. ABSOLUTELY NO DATAGRID or FuncDataTemplate: Never use DataGrid or FuncDataTemplate. For ListBox/ComboBox, set `ItemsSource = myCollection.Select(u => $""{{u.Name}} ({{u.Role}})"").ToList()`.
 5. AVALONIA CONTROL ITEMS PROPERTY IS READ-ONLY:
-   - Never assign directly to `comboBox.Items = ...` or `listBox.Items = ...`! Always use `comboBox.ItemsSource = ...` or `listBox.ItemsSource = ...`.
-6. TEXTBOX PLACEHOLDER: Use `TextBox.PlaceholderText` instead of `TextBox.Watermark` (`Watermark` is obsolete).
-7. GRID METHODS: Use static method `Grid.SetColumn(control, col)` to position elements. NEVER call non-existent `Grid.GetColumn(grid, index)` multi-argument overloads!
-8. NO MVVM & NO EXTRA CLASSES: Write all interactive logic, events, and styling directly in C# Code-Behind inside your main View class. Do NOT define helper classes or extension methods outside the class!
-9. PARAMETERLESS CONSTRUCTOR: Always provide a public parameterless constructor (`public MyView() {{ }}`) alongside any context-injecting constructor so reflection can safely instantiate your class.
-10. NAMESPACE AND IMPORTS: You must always declare a namespace (e.g., `namespace Kreta.Dynamic;`) and include these exact imports at the top:
+   - NEVER assign to `comboBox.Items = ...` or `listBox.Items = ...`! Always use `comboBox.ItemsSource = ...` or `listBox.ItemsSource = ...`.
+6. TEXTBOX PLACEHOLDER: Use `TextBox.PlaceholderText` instead of `TextBox.Watermark`.
+7. NO 'Panel.Child': `Panel` and `StackPanel` do NOT have a `.Child` property! Use `.Children.Add(...)`. Only `Border` has a `.Child` property.
+8. GRID POSITIONING: Use static method `Grid.SetColumn(control, col)` and `Grid.SetRow(control, row)`. NEVER call `Grid.GetColumn(grid, index)` with 2 arguments!
+9. PARAMETERLESS CONSTRUCTOR: Always provide a public parameterless constructor (`public MyView() {{ }}`) alongside any context-injecting constructor.
+10. REQUIRED IMPORTS: Always include these exact imports at the top:
    using System;
    using System.Collections.Generic;
    using System.Linq;
@@ -249,16 +254,15 @@ CRITICAL C# COMPILATION RULES (VIOLATION WILL BREAK THE BUILD):
    using Avalonia.Media;
    using Kreta.Core;
    using Kreta.Contexts;
-11. UNIQUE CLASS NAME: The class name must be completely unique (e.g., `MyFeature_UniqueString`). It must inherit from `UserControl` and implement `IEvolView`.
-12. IEvolView INTERFACE MEMBERS (MUST BE IMPLEMENTED EXACTLY):
+11. UNIQUE CLASS NAME: Name must be unique (e.g., `MyFeature_UniqueString`), inherit `UserControl` and implement `IEvolView`.
+12. IEvolView INTERFACE:
    - `public string Name => ""A funkció magyar neve"";`
-   - `public string Description => ""A funkció rövid magyar leírása"";`
-   - `public Control CreateView()` EVERY code path inside this method MUST end in a `return` statement.
-13. KEEP THE CODE SHORT AND SIMPLE. Prefer the minimum amount of C# needed to satisfy the request. Long responses fail due to token limits.
-14. `Grid` has NO `Padding` property. Wrap it in a `Border {{ Padding = ... }}` instead.
+   - `public string Description => ""Rövid magyar leírás"";`
+   - `public Control CreateView()` Every path MUST end in a `return` statement.
+13. KEEP CODE SHORT AND SIMPLE: Keep C# minimal so it fits comfortably within token limits.
 
 =========================================
-C# CLASS STRUCTURE BONES TEMPLATE:
+C# CLASS STRUCTURE TEMPLATE:
 =========================================
 using System;
 using System.Collections.Generic;
@@ -298,9 +302,9 @@ public class MyUniqueFeatureView : UserControl, IEvolView
 }}
 
 =========================================
-SECURITY ENFORCEMENT & SHIELD (GUARDRAILS):
+SECURITY GUARDRAILS:
 =========================================
-- If a user requests a feature that violates their role permissions, return a JSON object with this exact error schema:
+- If a user requests a feature that violates their role permissions, return JSON with:
   {{
     ""action"": ""REJECT"",
     ""target"": ""HibaView"",

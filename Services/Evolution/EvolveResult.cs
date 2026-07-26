@@ -3,6 +3,9 @@ using Avalonia.Controls;
 
 namespace Kreta.Services.Evolution;
 
+/// <summary>
+/// Az evolúciós kódgenerálás és betöltés eredményét tároló adatmodell.
+/// </summary>
 public class EvolveResult
 {
     public bool IsSuccess { get; set; }

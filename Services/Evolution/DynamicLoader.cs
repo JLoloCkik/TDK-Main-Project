@@ -14,6 +14,9 @@ using Kreta.Services.Database;
 
 namespace Kreta.Services.Evolution;
 
+/// <summary>
+/// Dinamikusan fordítja le és példányosítja a C# forráskódot futásidőben Roslyn segítségével.
+/// </summary>
 public class DynamicLoader : IDynamicLoader
 {
     public DynamicLoadResult LoadViewFromCode(string sourceCode)
@@ -23,6 +26,7 @@ public class DynamicLoader : IDynamicLoader
             var syntaxTree = CSharpSyntaxTree.ParseText(sourceCode);
             var assemblyName = $"KretaDynamic_{Guid.NewGuid():N}";
 
+            // Begyűjtjük az összes szükséges szerelvényt az AppDomain-ből
             var assembliesToRef = new HashSet<Assembly>
             {
                 typeof(object).Assembly,
@@ -60,7 +64,6 @@ public class DynamicLoader : IDynamicLoader
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
             using var ms = new MemoryStream();
-            
             var emitResult = compilation.Emit(ms);
 
             if (!emitResult.Success)
@@ -87,7 +90,7 @@ public class DynamicLoader : IDynamicLoader
                 return new DynamicLoadResult
                 {
                     IsSuccess = false,
-                    ErrorMessage = "Nem található IEvolView megvalósítás a kódban."
+                    ErrorMessage = "Nem található IEvolView megvalósítás a generált kódban."
                 };
             }
 
@@ -101,11 +104,11 @@ public class DynamicLoader : IDynamicLoader
             }
             else
             {
-                // 2. Ha nincs paraméter nélküli, kiszolgáljuk a kontextusfüggő konstruktort
+                // 2. Ha csak kontextusos konstruktor létezik, felmérjük és injektáljuk az argumentumokat
                 var ctors = type.GetConstructors();
                 if (ctors.Length > 0)
                 {
-                    var ctor = ctors[0];
+                    var ctor = ctors.OrderByDescending(c => c.GetParameters().Length).First();
                     var parameters = ctor.GetParameters();
                     var args = new object?[parameters.Length];
 

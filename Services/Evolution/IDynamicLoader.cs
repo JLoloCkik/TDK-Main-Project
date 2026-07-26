@@ -3,6 +3,9 @@ using Avalonia.Controls;
 
 namespace Kreta.Services.Evolution;
 
+/// <summary>
+/// A dinamikus fordítás és betöltés eredményét összefoglaló osztály.
+/// </summary>
 public class DynamicLoadResult
 {
     public bool IsSuccess { get; set; }
@@ -11,6 +14,9 @@ public class DynamicLoadResult
     public Assembly? CompiledAssembly { get; set; }
 }
 
+/// <summary>
+/// Dinamikus Roslyn C# kód fordításáért és betöltéséért felelős felület.
+/// </summary>
 public interface IDynamicLoader
 {
     DynamicLoadResult LoadViewFromCode(string sourceCode);
