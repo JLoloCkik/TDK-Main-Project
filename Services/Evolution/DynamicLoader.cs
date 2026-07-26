@@ -1,13 +1,16 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Loader;
 using Avalonia.Controls;
+using Avalonia.Layout;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Kreta.Core;
 using Kreta.Contexts;
+using Kreta.Services.Database;
 
 namespace Kreta.Services.Evolution;
 
@@ -20,20 +23,35 @@ public class DynamicLoader : IDynamicLoader
             var syntaxTree = CSharpSyntaxTree.ParseText(sourceCode);
             var assemblyName = $"KretaDynamic_{Guid.NewGuid():N}";
 
-            var references = new MetadataReference[]
+            var assembliesToRef = new HashSet<Assembly>
             {
-                MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-                MetadataReference.CreateFromFile(typeof(Console).Assembly.Location),
-                MetadataReference.CreateFromFile(typeof(UserControl).Assembly.Location),
-                MetadataReference.CreateFromFile(typeof(Control).Assembly.Location),
-                MetadataReference.CreateFromFile(typeof(IEvolView).Assembly.Location),
-                MetadataReference.CreateFromFile(Assembly.Load("System.Runtime").Location),
-                MetadataReference.CreateFromFile(Assembly.Load("System.Collections").Location),
-                MetadataReference.CreateFromFile(Assembly.Load("System.Linq").Location),
-                MetadataReference.CreateFromFile(Assembly.Load("Avalonia.Base").Location),
-                MetadataReference.CreateFromFile(Assembly.Load("Avalonia.Controls").Location),
-                MetadataReference.CreateFromFile(Assembly.Load("Avalonia.Layout").Location)
+                typeof(object).Assembly,
+                typeof(Console).Assembly,
+                typeof(Enumerable).Assembly,
+                typeof(UserControl).Assembly,
+                typeof(Control).Assembly,
+                typeof(HorizontalAlignment).Assembly,
+                typeof(Avalonia.Media.Brushes).Assembly,
+                typeof(IEvolView).Assembly,
+                typeof(IStudentContext).Assembly,
+                typeof(ITeacherContext).Assembly,
+                typeof(IDirectorContext).Assembly,
+                typeof(KretaDbContext).Assembly
             };
+
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (!asm.IsDynamic && !string.IsNullOrWhiteSpace(asm.Location))
+                {
+                    assembliesToRef.Add(asm);
+                }
+            }
+
+            var references = assembliesToRef
+                .Where(a => !a.IsDynamic && !string.IsNullOrWhiteSpace(a.Location) && File.Exists(a.Location))
+                .Select(a => MetadataReference.CreateFromFile(a.Location))
+                .Cast<MetadataReference>()
+                .ToList();
 
             var compilation = CSharpCompilation.Create(
                 assemblyName,
@@ -42,6 +60,7 @@ public class DynamicLoader : IDynamicLoader
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
             using var ms = new MemoryStream();
+            
             var emitResult = compilation.Emit(ms);
 
             if (!emitResult.Success)
@@ -72,7 +91,59 @@ public class DynamicLoader : IDynamicLoader
                 };
             }
 
-            var instance = Activator.CreateInstance(type);
+            object? instance = null;
+
+            // 1. Megpróbáljuk a paraméter nélküli konstruktort
+            var defaultCtor = type.GetConstructor(Type.EmptyTypes);
+            if (defaultCtor != null)
+            {
+                instance = Activator.CreateInstance(type);
+            }
+            else
+            {
+                // 2. Ha nincs paraméter nélküli, kiszolgáljuk a kontextusfüggő konstruktort
+                var ctors = type.GetConstructors();
+                if (ctors.Length > 0)
+                {
+                    var ctor = ctors[0];
+                    var parameters = ctor.GetParameters();
+                    var args = new object?[parameters.Length];
+
+                    for (int i = 0; i < parameters.Length; i++)
+                    {
+                        var paramType = parameters[i].ParameterType;
+                        
+                        if (paramType == typeof(IStudentContext))
+                        {
+                            args[i] = new SqliteStudentContext(new KretaDbContext(), 1);
+                        }
+                        else if (paramType == typeof(ITeacherContext))
+                        {
+                            args[i] = new SqliteTeacherContext(new KretaDbContext());
+                        }
+                        else if (paramType == typeof(IDirectorContext))
+                        {
+                            args[i] = new SqliteDirectorContext(new KretaDbContext());
+                        }
+                        else
+                        {
+                            args[i] = paramType.IsValueType ? Activator.CreateInstance(paramType) : null;
+                        }
+                    }
+
+                    instance = ctor.Invoke(args);
+                }
+            }
+
+            if (instance == null)
+            {
+                return new DynamicLoadResult
+                {
+                    IsSuccess = false,
+                    ErrorMessage = "Nem sikerült példányosítani a generált osztályt."
+                };
+            }
+
             var evolView = instance as IEvolView;
             var control = evolView?.CreateView();
 

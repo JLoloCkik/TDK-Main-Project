@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -10,6 +12,10 @@ namespace Kreta.Services.AI;
 public class AiService : IAiService
 {
     private readonly HttpClient _httpClient;
+
+    // Statikusan tároljuk a legutóbb sikeresen működő verziót és modellt
+    private static string? _preferredVersion;
+    private static string? _preferredModel;
 
     public AiService()
     {
@@ -62,12 +68,26 @@ public class AiService : IAiService
                 "export GEMINI_API_KEY=\"a_te_kulcsod_itt\" && dotnet run");
         }
 
-        var fallbackMatrix = new[]
+        var defaultMatrix = new[]
         {
-            new { Version = "v1beta", Model = "gemini-2.5-flash" },
             new { Version = "v1beta", Model = "gemini-2.5-pro" },
+            new { Version = "v1beta", Model = "gemini-2.5-flash" },
             new { Version = "v1beta", Model = "gemini-3.5-flash" }
         };
+
+        var fallbackMatrix = new List<dynamic>();
+        if (!string.IsNullOrEmpty(_preferredVersion) && !string.IsNullOrEmpty(_preferredModel))
+        {
+            fallbackMatrix.Add(new { Version = _preferredVersion, Model = _preferredModel });
+        }
+
+        foreach (var item in defaultMatrix)
+        {
+            if (item.Version != _preferredVersion || item.Model != _preferredModel)
+            {
+                fallbackMatrix.Add(item);
+            }
+        }
 
         Exception? lastException = null;
 
@@ -90,8 +110,11 @@ public class AiService : IAiService
                         Console.WriteLine($"[AI Kapcsolat] Megkísérlés: {attempt.Version} - {attempt.Model}...");
                     }
 
-                    var response = await CallGeminiApiInternalAsync(prompt, role, history, apiKey, attempt.Version,
-                        attempt.Model);
+                    var response = await CallGeminiApiInternalAsync(prompt, role, history, apiKey, (string)attempt.Version, (string)attempt.Model);
+                    
+                    _preferredVersion = attempt.Version;
+                    _preferredModel = attempt.Model;
+
                     Console.WriteLine($"[AI Kapcsolat] SIKERES! Használt végpont: {attempt.Version}/{attempt.Model}");
                     return response;
                 }
@@ -113,7 +136,7 @@ public class AiService : IAiService
                     }
 
                     if (retry < maxRetries - 1 && (ex.Message.Contains("503") || ex.Message.Contains("429") ||
-                                                   ex.Message.Contains("Hálózati hiba")))
+                                                   ex.Message.Contains("Hálózati hiba") || ex.Message.Contains("MAX_TOKENS")))
                     {
                         Console.WriteLine(
                             $"[AI Kapcsolat] Átmeneti hiba észlelve. Várakozás {delayMs} ms-ig az újrapróbálkozás előtt...");
@@ -207,28 +230,32 @@ CRITICAL C# COMPILATION RULES (VIOLATION WILL BREAK THE BUILD):
 =========================================
 1. NO TOP-LEVEL STATEMENTS: Do NOT write code outside of class structures. Absolutely everything must reside within standard class declarations, properties, constructors, or methods. No loose statements in the file!
 2. NO 'Student' TYPE: There is NO 'Student' class. Students are represented by the 'User' class where 'user.Role == Role.Student'.
-3. NO 'Weight' PROPERTY: Do NOT reference 'grade.Weight' or 'Weight' on the Grade class. It does not exist and will break compilation!
-4. ABSOLUTELY NO DATAGRID: The Avalonia DataGrid NuGet package is NOT referenced in this project. You must NEVER use `DataGrid`, `DataGridTextColumn`, `DataGridLength`, `DataGridHeadersVisibility`, or any other DataGrid classes. If you need to display tables, build them manually using standard controls like `Grid` (with RowDefinitions/ColumnDefinitions), `Border`, `ListBox`, or nested `StackPanel` layouts.
-5. NO MVVM: Write all interactive logic, events, and styling directly in C# Code-Behind inside your View class.
-6. NO CYRILLIC OR ALIEN CHARACTERS: All code characters must be standard ASCII/Latin characters. Do NOT use Cyrillic, Russian, or other non-Latin character sets under any circumstances!
-7. NAMESPACE AND IMPORTS: You must always declare a namespace (e.g., `namespace Kreta.Dynamic;`) and include these exact imports at the top:
+3. NO 'Weight' PROPERTY: Do NOT reference 'grade.Weight' or 'Weight' on the Grade class.
+4. ABSOLUTELY NO DATAGRID: The Avalonia DataGrid NuGet package is NOT referenced in this project.
+5. AVALONIA CONTROL ITEMS PROPERTY IS READ-ONLY:
+   - Never assign directly to `comboBox.Items = ...` or `listBox.Items = ...`! Always use `comboBox.ItemsSource = ...` or `listBox.ItemsSource = ...`.
+6. TEXTBOX PLACEHOLDER: Use `TextBox.PlaceholderText` instead of `TextBox.Watermark` (`Watermark` is obsolete).
+7. GRID METHODS: Use static method `Grid.SetColumn(control, col)` to position elements. NEVER call non-existent `Grid.GetColumn(grid, index)` multi-argument overloads!
+8. NO MVVM & NO EXTRA CLASSES: Write all interactive logic, events, and styling directly in C# Code-Behind inside your main View class. Do NOT define helper classes or extension methods outside the class!
+9. PARAMETERLESS CONSTRUCTOR: Always provide a public parameterless constructor (`public MyView() {{ }}`) alongside any context-injecting constructor so reflection can safely instantiate your class.
+10. NAMESPACE AND IMPORTS: You must always declare a namespace (e.g., `namespace Kreta.Dynamic;`) and include these exact imports at the top:
    using System;
    using System.Collections.Generic;
    using System.Linq;
    using Avalonia;
    using Avalonia.Controls;
+   using Avalonia.Controls.Primitives;
    using Avalonia.Layout;
    using Avalonia.Media;
    using Kreta.Core;
    using Kreta.Contexts;
-8. UNIQUE CLASS NAME: The class name must be completely unique (e.g., `MyFeature_UniqueString`). It must inherit from `UserControl` and implement `IEvolView`.
-9. IEvolView INTERFACE MEMBERS (MUST BE IMPLEMENTED EXACTLY):
+11. UNIQUE CLASS NAME: The class name must be completely unique (e.g., `MyFeature_UniqueString`). It must inherit from `UserControl` and implement `IEvolView`.
+12. IEvolView INTERFACE MEMBERS (MUST BE IMPLEMENTED EXACTLY):
    - `public string Name => ""A funkció magyar neve"";`
-   - `public string Description => ""A funkció rövid magyar leírása"";` (MANDATORY property, do not omit!)
-   - `public Control CreateView()` (THE RETURN TYPE MUST BE EXACTLY `Control`. Inside, return a control (like a Panel, Grid or Border) that is or inherits from `Control`.) EVERY code path inside this method MUST end in a `return` statement — never leave a branch (e.g. an empty-list check) without returning something.
-10. `ListBox` in this Avalonia version does NOT support several properties you might expect: no `SelectionMode.None` (only `Single`, `Multiple`, `Toggle`, `AlwaysSelected` exist), and NO `HorizontalContentAlignment` / `VerticalContentAlignment` directly on the `ListBox` itself (only settable per-item via a `ListBoxItem` style selector, which is unnecessary complexity here). To avoid this whole class of error: **for displaying static/read-only tabular or list data (e.g. a table of students, grades, classes), do NOT use `ListBox` at all.** Instead wrap a `StackPanel` (or `Grid` rows) in a `ScrollViewer` and add the rows manually in a `foreach` loop. Reserve `ListBox` ONLY for cases where the user must actually click/select one item from a list to trigger an action.
-11. KEEP THE CODE SHORT AND SIMPLE. Prefer the minimum amount of C# needed to satisfy the request (simple StackPanel/Grid layouts, no elaborate nested styling). Long, over-engineered responses are more likely to be cut off mid-generation and fail to compile — brevity is a correctness requirement here, not just a style preference.
-12. `Grid` has NO `Padding` property (only `Border`, `ContentControl`, and `Decorator`-derived controls have `Padding`). If a `Grid` needs inner spacing, wrap it in a `Border {{ Padding = ... }}` instead, or set `Margin` on the individual child elements. The same applies to `StackPanel` and other plain `Panel`-derived controls — they only support `Margin` on their children, never their own `Padding`.
+   - `public string Description => ""A funkció rövid magyar leírása"";`
+   - `public Control CreateView()` EVERY code path inside this method MUST end in a `return` statement.
+13. KEEP THE CODE SHORT AND SIMPLE. Prefer the minimum amount of C# needed to satisfy the request. Long responses fail due to token limits.
+14. `Grid` has NO `Padding` property. Wrap it in a `Border {{ Padding = ... }}` instead.
 
 =========================================
 C# CLASS STRUCTURE BONES TEMPLATE:
@@ -238,6 +265,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Kreta.Core;
@@ -250,7 +278,11 @@ public class MyUniqueFeatureView : UserControl, IEvolView
     public string Name => ""A funkció magyar neve"";
     public string Description => ""Rövid magyar leírás"";
     
-    private readonly IStudentContext _context;
+    private readonly IStudentContext? _context;
+
+    public MyUniqueFeatureView()
+    {{
+    }}
 
     public MyUniqueFeatureView(IStudentContext context)
     {{
@@ -268,8 +300,7 @@ public class MyUniqueFeatureView : UserControl, IEvolView
 =========================================
 SECURITY ENFORCEMENT & SHIELD (GUARDRAILS):
 =========================================
-- If a user requests a feature that violates their role permissions (e.g., a Student requests to write grades, create a tournament, or modify other users), you MUST reject the request.
-- To reject a request, return a JSON object with this exact error schema:
+- If a user requests a feature that violates their role permissions, return a JSON object with this exact error schema:
   {{
     ""action"": ""REJECT"",
     ""target"": ""HibaView"",
@@ -287,9 +318,7 @@ A rendszer megpróbálta lefordítani/betölteni az előző válaszodat, de a k�
 
 {history}
 
-Ez alapján generálj EGY TELJES, ÚJ, JAVÍTOTT megoldást, ami ezt a konkrét hibát kiküszöböli. Ha a hiba
-arra utal, hogy a válaszod félbeszakadt (pl. token-limit / hiányzó záró jelek / ""not all code paths
-return a value""), akkor most ÍRJ RÖVIDEBB, EGYSZERŰBB kódot, hogy biztosan elférjen egy válaszban.")}
+Ez alapján generálj EGY TELJES, ÚJ, JAVÍTOTT megoldást, ami ezt a konkrét hibát kiküszöbli. ÍRJ RÖVIDEBB, EGYSZERŰBB kódot, hogy biztosan elférjen egy válaszban.")}
 ";
 
         var payload = new
