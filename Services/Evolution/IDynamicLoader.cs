@@ -1,11 +1,17 @@
-using System.Collections.Generic;
 using System.Reflection;
-using Kreta.Core;
+using Avalonia.Controls;
 
 namespace Kreta.Services.Evolution;
 
-public interface IDynamicLoader {
-    Assembly LoadAssembly(string dllPath);
-    void UnloadAssembly();
-    List<IEvolView> GetViewsFromAssembly(string dllPath);
+public class DynamicLoadResult
+{
+    public bool IsSuccess { get; set; }
+    public string? ErrorMessage { get; set; }
+    public Control? ViewControl { get; set; }
+    public Assembly? CompiledAssembly { get; set; }
+}
+
+public interface IDynamicLoader
+{
+    DynamicLoadResult LoadViewFromCode(string sourceCode);
 }

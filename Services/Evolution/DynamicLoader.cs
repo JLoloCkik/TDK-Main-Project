@@ -1,65 +1,95 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
+using System.Runtime.Loader;
+using Avalonia.Controls;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Kreta.Core;
+using Kreta.Contexts;
 
 namespace Kreta.Services.Evolution;
 
-/// <summary>
-/// Egyetlen, elszigetelt (Collectible) AssemblyLoadContext egyetlen generált
-/// DLL-hez. FONTOS: egy ALC egyszer tölthető be, majd Unload() után végleg
-/// használhatatlanná válik — nem szabad ugyanazt a példányt újra betölteni!
-/// A hívónak (MainWindow) minden új generáláskor ÚJ DynamicLoader-t kell
-/// létrehoznia, a régit pedig előtte le kell állítania.
-/// </summary>
-public class DynamicLoader : System.Runtime.Loader.AssemblyLoadContext, IDynamicLoader
+public class DynamicLoader : IDynamicLoader
 {
-    private bool _unloaded;
-
-    public DynamicLoader() : base(isCollectible: true) { }
-
-    public Assembly LoadAssembly(string dllPath)
+    public DynamicLoadResult LoadViewFromCode(string sourceCode)
     {
-        if (_unloaded)
-            throw new InvalidOperationException(
-                "Ez az ALC már le lett állítva (Unload). Hozz létre egy új DynamicLoader példányt!");
-
-        using var fs = File.OpenRead(dllPath);
-        return LoadFromStream(fs);
-    }
-
-    public void UnloadAssembly()
-    {
-        if (_unloaded) return;
-        _unloaded = true;
-
-        Unload();
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
-        GC.Collect();
-    }
-
-    public List<IEvolView> GetViewsFromAssembly(string dllPath)
-    {
-        var assembly = LoadAssembly(dllPath);
-        var views = new List<IEvolView>();
-
-        foreach (Type type in assembly.GetTypes())
+        try
         {
-            if (typeof(IEvolView).IsAssignableFrom(type)
-                && !type.IsInterface
-                && !type.IsAbstract)
+            var syntaxTree = CSharpSyntaxTree.ParseText(sourceCode);
+            var assemblyName = $"KretaDynamic_{Guid.NewGuid():N}";
+
+            var references = new MetadataReference[]
             {
-                IEvolView? view = Activator.CreateInstance(type) as IEvolView;
+                MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(Console).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(UserControl).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(Control).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(IEvolView).Assembly.Location),
+                MetadataReference.CreateFromFile(Assembly.Load("System.Runtime").Location),
+                MetadataReference.CreateFromFile(Assembly.Load("System.Collections").Location),
+                MetadataReference.CreateFromFile(Assembly.Load("System.Linq").Location),
+                MetadataReference.CreateFromFile(Assembly.Load("Avalonia.Base").Location),
+                MetadataReference.CreateFromFile(Assembly.Load("Avalonia.Controls").Location),
+                MetadataReference.CreateFromFile(Assembly.Load("Avalonia.Layout").Location)
+            };
 
-                if (view != null)
+            var compilation = CSharpCompilation.Create(
+                assemblyName,
+                new[] { syntaxTree },
+                references,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            using var ms = new MemoryStream();
+            var emitResult = compilation.Emit(ms);
+
+            if (!emitResult.Success)
+            {
+                var errors = string.Join("\n", emitResult.Diagnostics
+                    .Where(d => d.Severity == DiagnosticSeverity.Error)
+                    .Select(d => d.GetMessage()));
+
+                return new DynamicLoadResult
                 {
-                    views.Add(view);
-                }
+                    IsSuccess = false,
+                    ErrorMessage = errors
+                };
             }
-        }
 
-        return views;
+            ms.Seek(0, SeekOrigin.Begin);
+            var alc = new AssemblyLoadContext(assemblyName, isCollectible: true);
+            var assembly = alc.LoadFromStream(ms);
+
+            var type = assembly.GetTypes().FirstOrDefault(t => typeof(IEvolView).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract);
+
+            if (type == null)
+            {
+                return new DynamicLoadResult
+                {
+                    IsSuccess = false,
+                    ErrorMessage = "Nem található IEvolView megvalósítás a kódban."
+                };
+            }
+
+            var instance = Activator.CreateInstance(type);
+            var evolView = instance as IEvolView;
+            var control = evolView?.CreateView();
+
+            return new DynamicLoadResult
+            {
+                IsSuccess = true,
+                ViewControl = control,
+                CompiledAssembly = assembly
+            };
+        }
+        catch (Exception ex)
+        {
+            return new DynamicLoadResult
+            {
+                IsSuccess = false,
+                ErrorMessage = ex.Message
+            };
+        }
     }
 }

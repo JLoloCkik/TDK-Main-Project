@@ -1,31 +1,46 @@
 using System;
 using System.IO;
-using System.Linq;
 
 namespace Kreta.Services;
 
-/// <summary>
-/// Segédosztály, ami megbízhatóan megtalálja a projekt gyökérkönyvtárát
-/// (ahol a .csproj van), függetlenül attól, hogy az alkalmazást
-/// "dotnet run"-nal, az IDE-ből, vagy a lefordított .exe dupla kattintásával
-/// indítjuk. Enélkül a relatív útvonalak (.env, kreta.db) az aktuális
-/// munkakönyvtártól (CWD) függtek, ami induláskor eltérő lehet.
-/// </summary>
 public static class PathHelper
 {
-    private static string? _cachedRoot;
-
-    public static string? FindProjectRoot()
+    /// <summary>
+    /// Intelligensen megkeresi a C# projekt gyökérmappáját (ahol a .csproj vagy a .git mappa található),
+    /// megelőzve, hogy a fájlok a bin/Debug/ kimeneti mappába mentődjenek.
+    /// </summary>
+    public static string GetProjectRootDirectory()
     {
-        if (_cachedRoot != null) return _cachedRoot;
+        var currentDir = new DirectoryInfo(AppContext.BaseDirectory);
 
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir != null && !dir.GetFiles("*.csproj").Any())
+        while (currentDir != null)
         {
-            dir = dir.Parent;
+            // Keressük a .csproj fájlt vagy a .git mappát a projekt gyökerének azonosításához
+            var csprojFiles = currentDir.GetFiles("*.csproj");
+            if (csprojFiles.Length > 0 || Directory.Exists(Path.Combine(currentDir.FullName, ".git")))
+            {
+                return currentDir.FullName;
+            }
+            currentDir = currentDir.Parent;
         }
 
-        _cachedRoot = dir?.FullName;
-        return _cachedRoot;
+        // Tartalék opció, ha a projektgyökér nem azonosítható
+        return AppContext.BaseDirectory;
+    }
+
+    /// <summary>
+    /// Visszaadja a projekt forráskódján belüli EvolViews mappa elérési útját.
+    /// </summary>
+    public static string GetEvolViewsDirectory()
+    {
+        var projectRoot = GetProjectRootDirectory();
+        var evolViewsDir = Path.Combine(projectRoot, "EvolViews");
+
+        if (!Directory.Exists(evolViewsDir))
+        {
+            Directory.CreateDirectory(evolViewsDir);
+        }
+
+        return evolViewsDir;
     }
 }
