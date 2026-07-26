@@ -1,10 +1,7 @@
-# Build mappák
-[Bb]in/
-[Oo]bj/
-
-# Rider / IDE mappák
+bin/
+obj/
+.env
+*.db
+Dynamic/
+.vs/
 .idea/
-*.user
-
-# Egyéb átmeneti fájlok
-*.cache
