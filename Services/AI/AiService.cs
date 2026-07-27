@@ -75,7 +75,7 @@ public class AiService : IAiService
         {
             new { Version = "v1beta", Model = "gemini-2.5-pro" },
             new { Version = "v1beta", Model = "gemini-2.5-flash" },
-            new { Version = "v1beta", Model = "gemini-3.5-flash" }
+            new { Version = "v1beta", Model = "gemini-2.0-flash" }
         };
 
         var fallbackMatrix = new List<dynamic>();

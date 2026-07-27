@@ -9,7 +9,6 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Kreta.Core;
 using Kreta.Contexts;
-using Kreta.Services.AI;
 using Kreta.Services.Database;
 using Kreta.Services.Evolution;
 
@@ -17,7 +16,6 @@ namespace Kreta;
 
 public partial class MainWindow : Window
 {
-    private readonly IAiService _aiService;
     private readonly IEvolutionService _evolutionService;
     private readonly KretaDbContext _dbContext;
 
@@ -26,10 +24,9 @@ public partial class MainWindow : Window
     // mielőtt a felhasználót zavarnánk vele. Lásd OnAiButtonClick.
     private const int MaxSelfHealAttempts = 3;
 
-    // Szimulált bejelentkezett diák, tanár és igazgató ID-ja
+    // Szimulált bejelentkezett diák ID-ja (a tanár és igazgató kontextusok nem
+    // felhasználó-specifikusak, ezért azoknak nincs szükségük ID-ra)
     private const int SimulatedStudentId = 1; // Kovács János
-    private const int SimulatedTeacherId = 4; // Szabó Mária
-    private const int SimulatedDirectorId = 5; // Nagy Péter
 
     private Role _currentRole = Role.Student;
 
@@ -52,7 +49,6 @@ public partial class MainWindow : Window
         _dbContext = new KretaDbContext();
         _dbContext.SeedData();
 
-        _aiService = new AiService();
         _evolutionService = new EvolutionService();
 
         // UI Eseménykezelők
