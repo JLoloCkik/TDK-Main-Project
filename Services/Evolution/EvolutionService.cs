@@ -35,12 +35,11 @@ public class EvolutionService : IEvolutionService
         _gitService = gitService;
     }
 
-    public async Task<EvolveResult> EvolveAsync(string prompt, Role currentRole)
+    public async Task<EvolveResult> EvolveAsync(string prompt, Role currentRole, int maxAttempts = 3)
     {
         Console.WriteLine($"[Evolúció] Új kérés feldolgozása: '{prompt}' ({currentRole})...");
 
         string? history = null;
-        int maxAttempts = 3;
 
         for (int attempt = 1; attempt <= maxAttempts; attempt++)
         {

@@ -32,10 +32,10 @@ public partial class MainWindow : Window
     private const int SimulatedDirectorId = 5; // Nagy Péter
 
     private Role _currentRole = Role.Student;
-    
+
     // Az összes betöltött modul forráskódja és példánya
     private readonly List<IEvolView> _loadedViews = new();
-    private readonly Dictionary<IEvolView, string> _viewSourceMap = new();
+    private readonly Dictionary<IEvolView, string> _viewFilePathMap = new();
     private readonly string _evolViewsDirectory;
 
     public MainWindow()
@@ -60,7 +60,7 @@ public partial class MainWindow : Window
         ApproveButton.Click += OnApproveButtonClick;
         DiscardButton.Click += OnDiscardButtonClick;
         RoleSelector.SelectionChanged += OnRoleChanged;
-        
+
         // Mentett fájlok betöltése és fordítása indításkor
         BootAndCompileSavedModules();
         RefreshSidebarMenu();
@@ -78,7 +78,7 @@ public partial class MainWindow : Window
                     VerticalAlignment = VerticalAlignment.Center,
                     HorizontalAlignment = HorizontalAlignment.Center,
                     Spacing = 10,
-                    Children = 
+                    Children =
                     {
                         new TextBlock
                         {
@@ -132,6 +132,7 @@ public partial class MainWindow : Window
                         if (instance != null)
                         {
                             _loadedViews.Add(instance);
+                            _viewFilePathMap[instance] = file;
                             loadedCount++;
                         }
                     }
@@ -140,7 +141,8 @@ public partial class MainWindow : Window
                 {
                     // Mentett modul fordítási hibájának konzolra írása
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"\n[RENDSZERINDÍTÁSI SÚLYOS HIBA] Nem sikerült lefordítani a korábbi modult ({viewName}):");
+                    Console.WriteLine(
+                        $"\n[RENDSZERINDÍTÁSI SÚLYOS HIBA] Nem sikerült lefordítani a korábbi modult ({viewName}):");
                     Console.WriteLine(result.ErrorMessage);
                     Console.ResetColor();
                 }
@@ -157,12 +159,26 @@ public partial class MainWindow : Window
         }
     }
 
+    private void RemoveStaleLoadedViews()
+    {
+        var stale = _viewFilePathMap
+            .Where(kvp => !File.Exists(kvp.Value))
+            .Select(kvp => kvp.Key)
+            .ToList();
+
+        foreach (var view in stale)
+        {
+            _loadedViews.Remove(view);
+            _viewFilePathMap.Remove(view);
+        }
+    }
+
     private IEvolView? InstantiateViewForRole(Type viewType)
     {
         try
         {
             var constructors = viewType.GetConstructors();
-            
+
             // Megkeressük, milyen interfészt vár a konstruktor
             foreach (var ctor in constructors)
             {
@@ -176,11 +192,13 @@ public partial class MainWindow : Window
                         var context = new SqliteStudentContext(_dbContext, SimulatedStudentId);
                         return (IEvolView?)Activator.CreateInstance(viewType, context);
                     }
+
                     if (paramType == typeof(ITeacherContext))
                     {
                         var context = new SqliteTeacherContext(_dbContext);
                         return (IEvolView?)Activator.CreateInstance(viewType, context);
                     }
+
                     if (paramType == typeof(IDirectorContext))
                     {
                         var context = new SqliteDirectorContext(_dbContext);
@@ -206,9 +224,12 @@ public partial class MainWindow : Window
         {
             // Konstruktor ellenőrzéssel kiszűrjük a megfelelő szerepköröket
             var constructors = view.GetType().GetConstructors();
-            bool isStudentView = constructors.Any(c => c.GetParameters().Any(p => p.ParameterType == typeof(IStudentContext)));
-            bool isTeacherView = constructors.Any(c => c.GetParameters().Any(p => p.ParameterType == typeof(ITeacherContext)));
-            bool isDirectorView = constructors.Any(c => c.GetParameters().Any(p => p.ParameterType == typeof(IDirectorContext)));
+            bool isStudentView =
+                constructors.Any(c => c.GetParameters().Any(p => p.ParameterType == typeof(IStudentContext)));
+            bool isTeacherView =
+                constructors.Any(c => c.GetParameters().Any(p => p.ParameterType == typeof(ITeacherContext)));
+            bool isDirectorView =
+                constructors.Any(c => c.GetParameters().Any(p => p.ParameterType == typeof(IDirectorContext)));
 
             bool isVisible = false;
             if (_currentRole == Role.Student && isStudentView) isVisible = true;
@@ -227,7 +248,7 @@ public partial class MainWindow : Window
                     Foreground = Brushes.White,
                     CornerRadius = new CornerRadius(6)
                 };
-                
+
                 btn.Click += (s, e) => NavigateToView(view);
                 SidebarMenuPanel.Children.Add(btn);
             }
@@ -267,115 +288,92 @@ public partial class MainWindow : Window
 
         try
         {
-            // Kontextus-érzékeny prompt összeállítása (egyszer, a ciklus előtt)
             var roleContextName = $"I{_currentRole}Context";
             var contextualPrompt = $"Felhasználó szerepköre: {_currentRole}. " +
                                    $"Az elvárt modul leírása: {prompt}." +
                                    $"\n\nFONTOS TECHNIKAI SZABÁLYOK:" +
-                                   $"\n1. Az osztály neve legyen egyedi (pl. MyFeature_{Guid.NewGuid():N}.cs)." +
+                                   $"\n1. Ha ÚJ funkciót hozol létre, az osztály neve legyen egyedi (pl. MyFeature_{Guid.NewGuid():N}). " +
+                                   $"Ha egy MEGLÉVŐ, fent felsorolt nézetet MÓDOSÍTASZ, tartsd meg PONTOSAN ugyanazt az osztálynevet!" +
                                    $"\n2. KÖTELEZŐEN a konstruktorában kérje be a '{roleContextName}' interfészt!" +
                                    $"\n3. Kizárólag a megadott {roleContextName} metódusait használd a mentésre és beolvasásra." +
                                    $"\n4. Építs fel egy szép Avalonia UI vezérlőt tiszta C# kóddal. Ha gombnyomás történik, ments el az adatokat és frissítsd a listákat.";
 
-            // Önjavító (Self-Healing) ciklus: ha a fordítás elhasal, a hibaüzenet
-            // visszamegy az AI-nak ('history' paraméterként), és újrapróbál —
-            // legfeljebb MaxSelfHealAttempts alkalommal, mielőtt feladná.
-            string? previousError = null;
+            StatusText.Text = "🤖 AI kód generálása (szükség esetén önjavítással)...";
+            StatusText.Foreground = Brushes.Orange;
 
-            for (int attempt = 1; attempt <= MaxSelfHealAttempts; attempt++)
+            EvolveResult result;
+            try
             {
-                StatusText.Text = attempt == 1
-                    ? "🤖 AI kód generálása..."
-                    : $"🔁 Önjavítás ({attempt}. próbálkozás)...";
-                StatusText.Foreground = Brushes.Orange;
+                result = await _evolutionService.EvolveAsync(contextualPrompt, _currentRole, MaxSelfHealAttempts);
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text = $"Hiba az AI hívás közben: {ex.Message}";
+                StatusText.Foreground = Brushes.Red;
+                return;
+            }
 
-                AiEvolveResponse response;
-                try
+            // Ha az AI törölt vagy felülírt egy fájlt, itt szűrjük ki a memóriából
+            // azokat a nézeteket, amelyek mögül eltűnt a lemezen lévő forrás.
+            RemoveStaleLoadedViews();
+
+            if (result.IsRejectedAction)
+            {
+                StatusText.Text = $"❌ {result.Description ?? "Hozzáférés megtagadva."}";
+                StatusText.Foreground = Brushes.Red;
+                RefreshSidebarMenu();
+                return;
+            }
+
+            if (result.IsDeletedAction)
+            {
+                StatusText.Text = $"🗑️ Modul törölve: {result.ViewName}";
+                StatusText.Foreground = Brushes.Green;
+                RefreshSidebarMenu();
+                PromptInput.Text = "";
+                return;
+            }
+
+            if (result.IsSuccess && result.CompiledAssembly != null && result.FilePath != null)
+            {
+                var newViewType = result.CompiledAssembly.GetTypes()
+                    .FirstOrDefault(t => typeof(IEvolView).IsAssignableFrom(t) && !t.IsInterface);
+
+                var newViewInstance = newViewType != null ? InstantiateViewForRole(newViewType) : null;
+
+                if (newViewInstance != null)
                 {
-                    response = await _aiService.GenerateFeatureAsync(contextualPrompt, _currentRole, previousError);
-                }
-                catch (Exception ex)
-                {
-                    StatusText.Text = $"Hiba az AI hívás közben: {ex.Message}";
-                    StatusText.Foreground = Brushes.Red;
+                    _loadedViews.Add(newViewInstance);
+                    _viewFilePathMap[newViewInstance] = result.FilePath;
+
+                    RefreshSidebarMenu();
+                    NavigateToView(newViewInstance);
+
+                    ApproveButton.IsVisible = true;
+                    DiscardButton.IsVisible = true;
+                    StatusText.Text = "✅ Sikeres generálás! Mentheti (Git push) vagy elvetheti a módosítást.";
+                    StatusText.Foreground = Brushes.Green;
                     return;
                 }
 
-                var result = await _evolutionService.EvolveFeatureAsync(
-                    response.ViewName, response.Description, response.SourceCode, response.TestCode);
-
-                if (result.IsSuccess && result.CompiledAssembly != null)
-                {
-                    var newViewType = result.CompiledAssembly.GetTypes()
-                        .FirstOrDefault(t => typeof(IEvolView).IsAssignableFrom(t) && !t.IsInterface);
-
-                    if (newViewType != null)
-                    {
-                        var newViewInstance = InstantiateViewForRole(newViewType);
-                        if (newViewInstance != null)
-                        {
-                            _loadedViews.Add(newViewInstance);
-                            _viewSourceMap[newViewInstance] = response.SourceCode;
-
-                            RefreshSidebarMenu();
-                            NavigateToView(newViewInstance);
-
-                            ApproveButton.IsVisible = true;
-                            DiscardButton.IsVisible = true;
-                            StatusText.Text = attempt == 1
-                                ? "Sikeres generálás! Mentheti vagy elvetheti a módosítást."
-                                : $"Sikeres generálás {attempt}. próbálkozásra (önjavítás működött)! Mentheti vagy elvetheti.";
-                            StatusText.Foreground = Brushes.Green;
-                            return;
-                        }
-
-                        previousError =
-                            "A fordítás sikeres volt, de a generált osztályt nem sikerült példányosítani a kért " +
-                            $"'{roleContextName}' konstruktor-paraméterrel. Ellenőrizd, hogy a konstruktor pontosan " +
-                            "ezt az egy interfészt várja paraméterként, semmi mást.";
-                        continue;
-                    }
-
-                    previousError =
-                        "A fordítás sikeres volt, de a válaszban nem volt IEvolView-t megvalósító osztály. " +
-                        "Győződj meg róla, hogy pontosan egy nyilvános osztály implementálja az IEvolView interfészt.";
-                    continue;
-                }
-
-                // Fordítási hiba — naplózzuk a konzolra, és előkészítjük a hibát a következő próbálkozáshoz.
-                previousError = result.ErrorMessage;
-
-                Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.WriteLine("\n========================================================================");
-                Console.WriteLine($"[GENERÁLT C# FORRÁSKÓD - {response.ViewName.ToUpper()} - {attempt}. PRÓBÁLKOZÁS]");
-                Console.WriteLine("========================================================================");
-                Console.ForegroundColor = ConsoleColor.White;
-                Console.WriteLine(response.SourceCode);
-
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("========================================================================");
-                Console.WriteLine($"[FORDÍTÁSI HIBAÜZENETEK - {attempt}. PRÓBÁLKOZÁS]");
-                Console.WriteLine("========================================================================");
-                Console.WriteLine(result.ErrorMessage);
-                Console.WriteLine("========================================================================\n");
-                Console.ResetColor();
-
-                if (attempt == MaxSelfHealAttempts)
-                {
-                    StatusText.Text = $"Fordítási hiba {MaxSelfHealAttempts} önjavító próbálkozás után is. Próbálja finomítani a promptot.";
-                    StatusText.Foreground = Brushes.Red;
-
-                    MainContentArea.Content = new ScrollViewer
-                    {
-                        Content = new TextBlock
-                        {
-                            Text = $"Fordítási hibák listája ({MaxSelfHealAttempts} próbálkozás után):\n{result.ErrorMessage}",
-                            Foreground = Brushes.Red,
-                            Margin = new Avalonia.Thickness(10)
-                        }
-                    };
-                }
+                StatusText.Text = "A fordítás sikeres volt, de a nézetet nem sikerült példányosítani.";
+                StatusText.Foreground = Brushes.Red;
+                return;
             }
+
+            // Sikertelen generálás/fordítás az önjavítási kísérletek után is
+            StatusText.Text = result.ErrorMessage ?? "Ismeretlen hiba történt a generálás során.";
+            StatusText.Foreground = Brushes.Red;
+
+            MainContentArea.Content = new ScrollViewer
+            {
+                Content = new TextBlock
+                {
+                    Text = $"Fordítási/generálási hiba:\n{result.ErrorMessage}",
+                    Foreground = Brushes.Red,
+                    Margin = new Avalonia.Thickness(10)
+                }
+            };
         }
         catch (Exception ex)
         {
@@ -388,59 +386,69 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnApproveButtonClick(object? sender, RoutedEventArgs e)
+    private async void OnApproveButtonClick(object? sender, RoutedEventArgs e)
     {
         if (_loadedViews.Count == 0) return;
 
         var lastView = _loadedViews.Last();
-        if (_viewSourceMap.TryGetValue(lastView, out var sourceCode))
+        if (!_viewFilePathMap.TryGetValue(lastView, out var filePath) || !File.Exists(filePath))
         {
-            try
-            {
-                // Elmentjük végleges fájlként a lemezre, hogy indításkor is betöltődjön
-                var fileName = $"EvolView_{lastView.GetType().Name}.cs";
-                var filePath = Path.Combine(_evolViewsDirectory, fileName);
-                File.WriteAllText(filePath, sourceCode);
-
-                StatusText.Text = $"Modul ({lastView.Name}) elmentve és rögzítve az iskolarendszerbe.";
-                StatusText.Foreground = Brushes.Green;
-
-                ApproveButton.IsVisible = false;
-                DiscardButton.IsVisible = false;
-                PromptInput.Text = "";
-            }
-            catch (Exception ex)
-            {
-                StatusText.Text = $"Hiba a mentés során: {ex.Message}";
-                StatusText.Foreground = Brushes.Red;
-            }
+            StatusText.Text = "Nem található a modulhoz tartozó fájl a lemezen.";
+            StatusText.Foreground = Brushes.Red;
+            return;
         }
-    }
 
-    private void OnDiscardButtonClick(object? sender, RoutedEventArgs e)
-    {
-        if (_loadedViews.Count > 0)
+        StatusText.Text = $"Modul ({lastView.Name}) feltöltése a GitHub 'ai-dev' ágára...";
+        StatusText.Foreground = Brushes.Orange;
+
+        try
         {
-            var lastView = _loadedViews.Last();
-            _loadedViews.Remove(lastView);
-            _viewSourceMap.Remove(lastView);
+            bool pushed = await _evolutionService.AcceptAndPushFeatureAsync(filePath, lastView.Name);
 
-            RefreshSidebarMenu();
-
-            MainContentArea.Content = new TextBlock
-            {
-                Text = "Generált modul sikeresen elvetve.",
-                VerticalAlignment = VerticalAlignment.Center,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                Foreground = Brushes.Gray
-            };
-
-            StatusText.Text = "Változtatások elvetve.";
-            StatusText.Foreground = Brushes.Orange;
+            StatusText.Text = pushed
+                ? $"Modul ({lastView.Name}) elmentve és sikeresen feltöltve a GitHubra."
+                : $"Modul ({lastView.Name}) elmentve, de a Git feltöltés sikertelen volt (lásd konzol).";
+            StatusText.Foreground = pushed ? Brushes.Green : Brushes.OrangeRed;
 
             ApproveButton.IsVisible = false;
             DiscardButton.IsVisible = false;
+            PromptInput.Text = "";
         }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"Hiba a Git feltöltés során: {ex.Message}";
+            StatusText.Foreground = Brushes.Red;
+        }
+    }
+
+    private async void OnDiscardButtonClick(object? sender, RoutedEventArgs e)
+    {
+        if (_loadedViews.Count == 0) return;
+
+        var lastView = _loadedViews.Last();
+        _loadedViews.Remove(lastView);
+
+        if (_viewFilePathMap.TryGetValue(lastView, out var filePath))
+        {
+            await _evolutionService.DiscardFeatureAsync(filePath);
+            _viewFilePathMap.Remove(lastView);
+        }
+
+        RefreshSidebarMenu();
+
+        MainContentArea.Content = new TextBlock
+        {
+            Text = "Generált modul sikeresen elvetve.",
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Foreground = Brushes.Gray
+        };
+
+        StatusText.Text = "Változtatások elvetve, a fájl törölve a lemezről.";
+        StatusText.Foreground = Brushes.Orange;
+
+        ApproveButton.IsVisible = false;
+        DiscardButton.IsVisible = false;
     }
 
     private void SetBusy(bool isBusy)
