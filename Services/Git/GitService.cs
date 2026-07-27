@@ -5,6 +5,9 @@ using System.Threading.Tasks;
 
 namespace Kreta.Services.Git;
 
+/// <summary>
+/// A Git parancsok automatikus futtatásáért és a GitHub 'ai-dev' ágára történő push-olásért felelős szolgáltatás.
+/// </summary>
 public class GitService : IGitService
 {
     private readonly string _workingDirectory;
@@ -15,7 +18,7 @@ public class GitService : IGitService
     }
 
     /// <summary>
-    /// Hozzáadja a módosított fájlt, commitolja, és feltölti a GitHub-ra az ai-dev ágra.
+    /// Hozzáadja a módosított vagy új C# fájlt, commitolja és feltölti a GitHub 'ai-dev' ágra.
     /// </summary>
     public async Task<bool> CommitAndPushAsync(string filePath, string commitMessage, string branchName = "ai-dev")
     {
@@ -29,14 +32,11 @@ public class GitService : IGitService
                 return false;
             }
 
-            // 1. Átváltás az ai-dev ágra (vagy létrehozás, ha nem létezik)
             await RunGitCommandAsync($"checkout -B {branchName}");
 
-            // 2. Fájl stégelése (git add)
             var relativePath = Path.GetRelativePath(_workingDirectory, filePath);
             await RunGitCommandAsync($"add \"{relativePath}\"");
 
-            // 3. Commit készítése
             var sanitizedMessage = commitMessage.Replace("\"", "'");
             var commitResult = await RunGitCommandAsync($"commit -m \"[AI-Evolúció] {sanitizedMessage}\"");
 
@@ -46,16 +46,48 @@ public class GitService : IGitService
                 return true;
             }
 
-            // 4. Push az ai-dev ágra
             Console.WriteLine($"[Git] Változtatások feltöltése a távoli tárhelyre (origin {branchName})...");
             await RunGitCommandAsync($"push -u origin {branchName}");
 
-            Console.WriteLine($"[Git Siker] A(z) {Path.GetFileName(filePath)} fájl sikeresen feltöltve a GitHub 'ai-dev' ágára!");
+            Console.WriteLine($"[Git Siker] A(z) {Path.GetFileName(filePath)} fájl sikeresen feltöltve a GitHub '{branchName}' ágára!");
             return true;
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[Git Hiba] Hiba történt a Git szinkronizáció során: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Eltávolítja a törölt C# fájlt a Git tárhelyből és elküldi a törlési commitot a remote ágra.
+    /// </summary>
+    public async Task<bool> RemoveAndPushAsync(string filePath, string commitMessage, string branchName = "ai-dev")
+    {
+        try
+        {
+            Console.WriteLine($"[Git] Fájl törlésének szinkronizálása a GitHub '{branchName}' ágra...");
+
+            if (!Directory.Exists(Path.Combine(_workingDirectory, ".git")))
+            {
+                return false;
+            }
+
+            await RunGitCommandAsync($"checkout -B {branchName}");
+
+            var relativePath = Path.GetRelativePath(_workingDirectory, filePath);
+            await RunGitCommandAsync($"rm \"{relativePath}\" --ignore-unmatch");
+
+            var sanitizedMessage = commitMessage.Replace("\"", "'");
+            await RunGitCommandAsync($"commit -m \"[AI-Evolúció - Törlés] {sanitizedMessage}\"");
+            await RunGitCommandAsync($"push -u origin {branchName}");
+
+            Console.WriteLine($"[Git Siker] A(z) {Path.GetFileName(filePath)} fájl törölve a GitHub '{branchName}' ágáról!");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Git Törlési Hiba]: {ex.Message}");
             return false;
         }
     }
@@ -83,6 +115,12 @@ public class GitService : IGitService
         string error = await process.StandardError.ReadToEndAsync();
         await process.WaitForExitAsync();
 
-        return output + "\n" + error;
+        var result = output + "\n" + error;
+        if (process.ExitCode != 0 && !result.Contains("nothing to commit"))
+        {
+            Console.WriteLine($"[Git Parancs Hiba ({arguments})]:\n{result}");
+        }
+
+        return result;
     }
 }

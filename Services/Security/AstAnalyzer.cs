@@ -6,7 +6,7 @@ using System.Linq;
 namespace Kreta.Services.Security;
 
 /// <summary>
-/// Statikus AST elemző a tiltott/veszélyes metódushívások felderítésére.
+/// Roslyn AST elemző a generált C# kód biztonsági átvizsgálásához.
 /// </summary>
 public class AstAnalyzer
 {

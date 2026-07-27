@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -9,13 +10,13 @@ using Kreta.Core;
 namespace Kreta.Services.AI;
 
 /// <summary>
-/// Gemini API kapcsolatot és C# UI kódgenerálást végző szolgáltatás.
+/// Gemini API kapcsolatot, meglévő nézetek kontextus-elemzését és C# UI kódgenerálást végző szolgáltatás.
 /// </summary>
 public class AiService : IAiService
 {
     private readonly HttpClient _httpClient;
 
-    // Statikusan tároljuk a legutóbb működő modellt, hogy a következő kérésnél azonnal ezzel indítsunk!
+    // Statikusan tároljuk a legutóbb működő modellt, hogy a következő kérésnél azonnal ezzel indítsunk
     private static string? _preferredVersion;
     private static string? _preferredModel;
 
@@ -57,7 +58,7 @@ public class AiService : IAiService
     public async Task<string> GenerateFeatureAsync(string prompt)
     {
         var response = await GenerateFeatureAsync(prompt, Role.Student, null);
-        return response.SourceCode;
+        return response.SourceCode ?? string.Empty;
     }
 
     public async Task<AiEvolveResponse> GenerateFeatureAsync(string prompt, Role role, string? history = null)
@@ -79,7 +80,6 @@ public class AiService : IAiService
 
         var fallbackMatrix = new List<dynamic>();
 
-        // 1. Ha már van bevált működő modellünk, az kerül a lista legelejére
         if (!string.IsNullOrEmpty(_preferredVersion) && !string.IsNullOrEmpty(_preferredModel))
         {
             fallbackMatrix.Add(new { Version = _preferredVersion, Model = _preferredModel });
@@ -116,7 +116,6 @@ public class AiService : IAiService
 
                     var response = await CallGeminiApiInternalAsync(prompt, role, history, apiKey, (string)attempt.Version, (string)attempt.Model);
                     
-                    // Megjegyezzük a sikeres típust
                     _preferredVersion = attempt.Version;
                     _preferredModel = attempt.Model;
 
@@ -160,90 +159,96 @@ public class AiService : IAiService
             $"Nem sikerült elérni a Gemini API-t egyik konfigurációval sem. Legutolsó hiba:\n{lastException?.Message}");
     }
 
+    private string GetExistingViewsContext()
+    {
+        try
+        {
+            var evolDir = PathHelper.GetEvolViewsDirectory();
+            if (!Directory.Exists(evolDir)) return "Nincsenek meglévő AI nézetek.";
+
+            var files = Directory.GetFiles(evolDir, "*.cs");
+            if (files.Length == 0) return "Nincsenek meglévő AI nézetek.";
+
+            var sb = new StringBuilder();
+            sb.AppendLine("AZ ALÁBBI AI ÁLTAL LÉTREHOZOTT NÉZETEK LÉTEZNEK A RENDSZERBEN:");
+            foreach (var file in files)
+            {
+                var fileName = Path.GetFileName(file);
+                var content = File.ReadAllText(file);
+                sb.AppendLine($"- Fájl: {fileName}");
+                if (content.Length > 800)
+                {
+                    sb.AppendLine($"  Kód részlet: {content.Substring(0, 800)}...\n");
+                }
+                else
+                {
+                    sb.AppendLine($"  Kód: {content}\n");
+                }
+            }
+            return sb.ToString();
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
     private async Task<AiEvolveResponse> CallGeminiApiInternalAsync(string prompt, Role role, string? history,
         string apiKey, string apiVersion, string modelName)
     {
         var url =
             $"https://generativelanguage.googleapis.com/{apiVersion}/models/{modelName}:generateContent?key={apiKey}";
 
+        var existingViewsContext = GetExistingViewsContext();
+
         var systemInstruction =
             $@"You are the automated C# and Avalonia UI compiler-agent for ""EvolKréta"", a self-evolving educational system.
-Your objective is to generate safe, compile-safe, and strictly role-appropriate C# code for a dynamic view.
+Your objective is to generate, MODIFY, or DELETE safe, compile-safe, and strictly role-appropriate C# code for dynamic views.
 
-THE ACTIVE USER ROLE IS PROVIDED DYNAMICALLY. YOU MUST COMPLY WITH THE RBAC MATRIX BELOW:
+ACTIVE USER ROLE: {role}
+
+{existingViewsContext}
+
+INSTRUCTIONS FOR MODIFYING OR DELETING EXISTING VIEWS:
+- If the prompt asks to EDIT/MODIFY an existing view (e.g., ""Módosítsd a Sportnap nézetet""), output the UPDATED full C# source code keeping the SAME class name base and structure.
+- If the prompt asks to DELETE/REMOVE an existing view (e.g., ""Töröld a Sportnap nézetet""), return JSON with:
+  {{
+    ""action"": ""DELETE"",
+    ""viewName"": ""ClassNameToDelete""
+  }}
 
 =========================================
 AVAILABLE CLASSES AND INTERFACES (CRITICAL FOR C# COMPILATION):
 =========================================
 - `Role` Enum: Student, Teacher, Director.
-- `User` Class: int Id, string Name, Role Role, string ClassName. (WARNING: NO 'Email' property exists in the User class. Never try to access user.Email!).
-- `Grade` Class: int Id, int StudentId, int SubjectId, int Value, DateTime Date, User? Student, Subject? Subject. (WARNING: NO 'Weight' property exists in the Grade class. Never try to access grade.Weight!).
+- `User` Class: int Id, string Name, Role Role, string ClassName. (WARNING: NO 'Email' property exists in User class!).
+- `Grade` Class: int Id, int StudentId, int SubjectId, int Value, DateTime Date, User? Student, Subject? Subject. (WARNING: NO 'Weight' property exists in Grade class!).
 - `Subject` Class: int Id, string Name.
 - `Lesson` Class: int Id, string ClassName, string SubjectName, string Room, DateTime Date.
-- `IStudentContext` Interface:
-    * List<Grade> GetMyGrades();
-    * User? GetMyProfile();
-    * List<Lesson> GetMyLessons();
-- `ITeacherContext` Interface:
-    * List<User> GetMyClassStudents();
-    * void AddGrade(int studentId, Grade grade);
-    * List<Subject> GetAllSubjects();
-    * List<string> GetAllClasses();
-    * List<Lesson> GetLessons();
-    * void AddLesson(Lesson lesson);
-- `IDirectorContext` Interface:
-    * List<User> GetAllUsers();
-    * void CreateUser(User newUser);
-    * void DeleteUser(int userId);
-    * List<string> GetAllClasses();
-    * void AssignClassToStudent(int studentId, string className);
+- `IStudentContext` Interface: List<Grade> GetMyGrades(); User? GetMyProfile(); List<Lesson> GetMyLessons();
+- `ITeacherContext` Interface: List<User> GetMyClassStudents(); void AddGrade(int studentId, Grade grade); List<Subject> GetAllSubjects(); List<string> GetAllClasses(); List<Lesson> GetLessons(); void AddLesson(Lesson lesson);
+- `IDirectorContext` Interface: List<User> GetAllUsers(); void CreateUser(User newUser); void DeleteUser(int userId); List<string> GetAllClasses(); void AssignClassToStudent(int studentId, string className);
 
 =========================================
 ROLE-BASED ACCESS CONTROL (RBAC) MATRIX:
 =========================================
-
-1. ROLE: Director (Igazgató)
-   - Access Scope: Unrestricted global school administration and metadata.
-   - Authorized Actions:
-     * Can create school-wide events, tournaments (e.g., ""Sakk verseny"", ""Iskolai Sportnap"").
-     * Can create entirely new database tables, global tabs, classes, and subjects.
-     * Can manage users, assign teachers to classes, and alter school-wide parameters.
-   - Code Constraints: Can access and inject 'IDirectorContext', 'ITeacherContext', and 'IStudentContext'.
-
-2. ROLE: Teacher (Tanár)
-   - Access Scope: Restricted strictly to classrooms and subjects they actively teach.
-   - Authorized Actions:
-     * Can write/modify grades, log attendance, and assign homework for their students.
-     * Can request class-level statistics, custom grading curves, or classroom-specific quizzes.
-   - Critical Limitations:
-     * CANNOT modify global school parameters, cannot create school-wide events/tabs, cannot delete users, cannot alter database schemas.
-   - Code Constraints: Can ONLY reference 'ITeacherContext' and 'IStudentContext'.
-     * ANY reference to 'IDirectorContext' is a critical security breach.
-
-3. ROLE: Student (Diák)
-   - Access Scope: Read-only personal student data and advanced individual analytics.
-   - Authorized Actions:
-     * Can query own grades, calculate GPA, and view study schedules.
-     * Can request personalized analytical widgets (e.g., ""How many grades do I need to reach an average of 5.0?"").
-   - Critical Limitations:
-     * CANNOT write grades, cannot modify any database records, cannot access other students' profiles or grades, cannot create school or class-level events.
-   - Code Constraints: Can ONLY reference 'IStudentContext'.
-     * ANY reference to 'ITeacherContext' or 'IDirectorContext' is a critical security breach.
+1. ROLE: Director (Igazgató) - Global access to school functions and administration.
+2. ROLE: Teacher (Tanár) - Strictly restricted to class and subject teaching. CANNOT access IDirectorContext.
+3. ROLE: Student (Diák) - Read-only personal student data. CANNOT access ITeacherContext or IDirectorContext.
 
 =========================================
-CRITICAL C# & AVALONIA COMPILATION RULES (STRICT COMPLIANCE REQUIRED):
+CRITICAL C# & AVALONIA COMPILATION RULES:
 =========================================
-1. NO TOP-LEVEL STATEMENTS: Everything must reside inside class declarations.
+1. NO TOP-LEVEL STATEMENTS: Everything inside class declarations.
 2. NO 'Student' TYPE: Use 'User' where 'user.Role == Role.Student'.
 3. NO 'Weight' PROPERTY on Grade.
-4. ABSOLUTELY NO DATAGRID or FuncDataTemplate: Never use DataGrid or FuncDataTemplate. For ListBox/ComboBox, set `ItemsSource = myCollection.Select(u => $""{{u.Name}} ({{u.Role}})"").ToList()`.
-5. AVALONIA CONTROL ITEMS PROPERTY IS READ-ONLY:
-   - NEVER assign to `comboBox.Items = ...` or `listBox.Items = ...`! Always use `comboBox.ItemsSource = ...` or `listBox.ItemsSource = ...`.
+4. NO DATAGRID or FuncDataTemplate. For ListBox/ComboBox, set `ItemsSource = myCollection.Select(u => $""{{u.Name}} ({{u.Role}})"").ToList()`.
+5. AVALONIA CONTROL ITEMS PROPERTY IS READ-ONLY: Use `comboBox.ItemsSource = ...` or `listBox.ItemsSource = ...`.
 6. TEXTBOX PLACEHOLDER: Use `TextBox.PlaceholderText` instead of `TextBox.Watermark`.
-7. NO 'Panel.Child': `Panel` and `StackPanel` do NOT have a `.Child` property! Use `.Children.Add(...)`. Only `Border` has a `.Child` property.
-8. GRID POSITIONING: Use static method `Grid.SetColumn(control, col)` and `Grid.SetRow(control, row)`. NEVER call `Grid.GetColumn(grid, index)` with 2 arguments!
-9. PARAMETERLESS CONSTRUCTOR: Always provide a public parameterless constructor (`public MyView() {{ }}`) alongside any context-injecting constructor.
-10. REQUIRED IMPORTS: Always include these exact imports at the top:
+7. NO 'Panel.Child': `StackPanel` does NOT have `.Child`! Use `.Children.Add(...)`. Only `Border` has `.Child`.
+8. GRID POSITIONING: Use static method `Grid.SetColumn(control, col)` and `Grid.SetRow(control, row)`.
+9. PARAMETERLESS CONSTRUCTOR: Always provide public parameterless constructor `public MyView() {{ }}` alongside context-injecting constructor.
+10. REQUIRED IMPORTS:
    using System;
    using System.Collections.Generic;
    using System.Linq;
@@ -254,52 +259,12 @@ CRITICAL C# & AVALONIA COMPILATION RULES (STRICT COMPLIANCE REQUIRED):
    using Avalonia.Media;
    using Kreta.Core;
    using Kreta.Contexts;
-11. UNIQUE CLASS NAME: Name must be unique (e.g., `MyFeature_UniqueString`), inherit `UserControl` and implement `IEvolView`.
+11. UNIQUE CLASS NAME: Inherit `UserControl` and implement `IEvolView`.
 12. IEvolView INTERFACE:
    - `public string Name => ""A funkció magyar neve"";`
    - `public string Description => ""Rövid magyar leírás"";`
-   - `public Control CreateView()` Every path MUST end in a `return` statement.
-13. KEEP CODE SHORT AND SIMPLE: Keep C# minimal so it fits comfortably within token limits.
-
-=========================================
-C# CLASS STRUCTURE TEMPLATE:
-=========================================
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using Avalonia;
-using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
-using Avalonia.Layout;
-using Avalonia.Media;
-using Kreta.Core;
-using Kreta.Contexts;
-
-namespace Kreta.Dynamic;
-
-public class MyUniqueFeatureView : UserControl, IEvolView
-{{
-    public string Name => ""A funkció magyar neve"";
-    public string Description => ""Rövid magyar leírás"";
-    
-    private readonly IStudentContext? _context;
-
-    public MyUniqueFeatureView()
-    {{
-    }}
-
-    public MyUniqueFeatureView(IStudentContext context)
-    {{
-        _context = context;
-    }}
-
-    public Control CreateView()
-    {{
-        var panel = new StackPanel {{ Spacing = 10, Margin = new Thickness(10) }};
-        panel.Children.Add(new TextBlock {{ Text = ""Szia Világ!"", FontSize = 16 }});
-        return panel;
-    }}
-}}
+   - `public Control CreateView()`
+13. KEEP C# SHORT & SIMPLE (Under 100 lines) so it easily fits within response token limits!
 
 =========================================
 SECURITY GUARDRAILS:
@@ -307,22 +272,18 @@ SECURITY GUARDRAILS:
 - If a user requests a feature that violates their role permissions, return JSON with:
   {{
     ""action"": ""REJECT"",
-    ""target"": ""HibaView"",
-    ""label"": ""Hiba"",
-    ""handlerName"": ""HibaView"",
-    ""handlerMethod"": ""using Avalonia.Controls;\nnamespace Kreta.Dynamic;\npublic class HibaView : UserControl, IEvolView {{\n    public string Name => \""Hiba\"";\n    public string Description => \""Hozzáférés megtagadva\"";\n    public Control CreateView() => new Label {{ Content = \""Hiba\"" }};\n}}"",
-    ""runtimeScript"": ""DisplayText = \""Hiba: Nincs jogosultsága ehhez a művelethez!\"";""
+    ""viewName"": ""HibaView"",
+    ""description"": ""Hozzáférés megtagadva""
   }}
 {(string.IsNullOrWhiteSpace(history) ? "" : $@"
 
 =========================================
 SELF-HEALING: AZ ELŐZŐ PRÓBÁLKOZÁSOD HIBÁS VOLT!
 =========================================
-A rendszer megpróbálta lefordítani/betölteni az előző válaszodat, de a következő hibát kapta:
-
+A fordítási hiba:
 {history}
 
-Ez alapján generálj EGY TELJES, ÚJ, JAVÍTOTT megoldást, ami ezt a konkrét hibát kiküszöbli. ÍRJ RÖVIDEBB, EGYSZERŰBB kódot, hogy biztosan elférjen egy válaszban.")}
+Ez alapján generálj EGY EGYSZERŰBB, RÖVIDEBB C# kódot, ami ezt kiküszöbli.")}
 ";
 
         var payload = new
@@ -351,7 +312,7 @@ Ez alapján generálj EGY TELJES, ÚJ, JAVÍTOTT megoldást, ami ezt a konkrét 
                         action = new { type = "STRING" },
                         handlerMethod = new { type = "STRING" }
                     },
-                    required = new[] { "viewName", "description", "sourceCode" }
+                    required = new[] { "viewName", "description" }
                 }
             }
         };
@@ -422,64 +383,13 @@ Ez alapján generálj EGY TELJES, ÚJ, JAVÍTOTT megoldást, ami ezt a konkrét 
                 Console.WriteLine(
                     "[RBAC Guardrail] Az AI elutasította a generálási kérést biztonsági szabályzat megsértése miatt.");
 
-                var safeHibaCode = @"using Avalonia.Controls;
-using Avalonia.Layout;
-using Avalonia.Media;
-using Kreta.Core;
-using Kreta.Contexts;
-
-namespace Kreta.Dynamic;
-
-public class HibaView : UserControl, IEvolView
-{
-    public string Name => ""Hozzáférés Megtagadva"";
-    public string Description => ""Hozzáférés-korlátozás hiba."";
-
-    public Control CreateView()
-    {
-        var panel = new StackPanel
-        {
-            Spacing = 16,
-            VerticalAlignment = VerticalAlignment.Center,
-            HorizontalAlignment = HorizontalAlignment.Center
-        };
-
-        panel.Children.Add(new TextBlock
-        {
-            Text = ""❌ Hozzáférés megtagadva!"",
-            FontSize = 18,
-            FontWeight = FontWeight.Bold,
-            Foreground = new SolidColorBrush(Color.Parse(""#C0392B"")),
-            HorizontalAlignment = HorizontalAlignment.Center
-        });
-
-        panel.Children.Add(new TextBlock
-        {
-            Text = ""Nincs jogosultsága a kért funkció végrehajtásához (RBAC hiba)."",
-            FontSize = 13,
-            Foreground = new SolidColorBrush(Color.Parse(""#7B241C"")),
-            TextWrapping = TextWrapping.Wrap,
-            HorizontalAlignment = HorizontalAlignment.Center
-        });
-
-        return new Border
-        {
-            Background = new SolidColorBrush(Color.Parse(""#FDEDEC"")),
-            BorderBrush = new SolidColorBrush(Color.Parse(""#F5B7B1"")),
-            BorderThickness = new Avalonia.Thickness(1),
-            CornerRadius = new Avalonia.CornerRadius(8),
-            Padding = new Avalonia.Thickness(24),
-            Margin = new Avalonia.Thickness(16),
-            Child = panel
-        };
-    }
-}";
                 return new AiEvolveResponse
                 {
                     ViewName = "Hozzáférés Megtagadva",
                     Description = "Szerepkör-alapú elutasítás.",
-                    SourceCode = safeHibaCode,
-                    TestCode = ""
+                    Action = "REJECT",
+                    SourceCode = string.Empty,
+                    TestCode = string.Empty
                 };
             }
 
@@ -487,6 +397,14 @@ public class HibaView : UserControl, IEvolView
             {
                 PropertyNameCaseInsensitive = true
             }) ?? throw new Exception("Nem sikerült deszerializálni a generált választ.");
+
+            if (!string.IsNullOrEmpty(result.SourceCode))
+            {
+                result.SourceCode = result.SourceCode
+                    .Replace("\\n", "\n")
+                    .Replace("\\r", "\r")
+                    .Replace("\\\"", "\"");
+            }
 
             return result;
         }

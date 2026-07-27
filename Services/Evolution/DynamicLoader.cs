@@ -14,9 +14,6 @@ using Kreta.Services.Database;
 
 namespace Kreta.Services.Evolution;
 
-/// <summary>
-/// Dinamikusan fordítja le és példányosítja a C# forráskódot futásidőben Roslyn segítségével.
-/// </summary>
 public class DynamicLoader : IDynamicLoader
 {
     public DynamicLoadResult LoadViewFromCode(string sourceCode)
@@ -26,7 +23,6 @@ public class DynamicLoader : IDynamicLoader
             var syntaxTree = CSharpSyntaxTree.ParseText(sourceCode);
             var assemblyName = $"KretaDynamic_{Guid.NewGuid():N}";
 
-            // Begyűjtjük az összes szükséges szerelvényt az AppDomain-ből
             var assembliesToRef = new HashSet<Assembly>
             {
                 typeof(object).Assembly,
@@ -96,7 +92,6 @@ public class DynamicLoader : IDynamicLoader
 
             object? instance = null;
 
-            // 1. Megpróbáljuk a paraméter nélküli konstruktort
             var defaultCtor = type.GetConstructor(Type.EmptyTypes);
             if (defaultCtor != null)
             {
@@ -104,7 +99,6 @@ public class DynamicLoader : IDynamicLoader
             }
             else
             {
-                // 2. Ha csak kontextusos konstruktor létezik, felmérjük és injektáljuk az argumentumokat
                 var ctors = type.GetConstructors();
                 if (ctors.Length > 0)
                 {
@@ -115,7 +109,7 @@ public class DynamicLoader : IDynamicLoader
                     for (int i = 0; i < parameters.Length; i++)
                     {
                         var paramType = parameters[i].ParameterType;
-                        
+
                         if (paramType == typeof(IStudentContext))
                         {
                             args[i] = new SqliteStudentContext(new KretaDbContext(), 1);

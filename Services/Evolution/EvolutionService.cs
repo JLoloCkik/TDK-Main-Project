@@ -9,7 +9,7 @@ using Kreta.Services.Security;
 namespace Kreta.Services.Evolution;
 
 /// <summary>
-/// Az evolúciós kódgenerálás életciklusát, a helyi állományok karbantartását és a Git szinkronizációt kezelő szolgáltatás.
+/// Az AI kódgenerálás, önjavítás (self-healing), lemezre mentés, törlés és Git push koordinációjáért felelős szolgáltatás.
 /// </summary>
 public class EvolutionService : IEvolutionService
 {
@@ -20,11 +20,6 @@ public class EvolutionService : IEvolutionService
 
     public EvolutionService()
         : this(new AiService(), new DynamicLoader(), new AstAnalyzer(), new GitService())
-    {
-    }
-
-    public EvolutionService(IAiService aiService)
-        : this(aiService, new DynamicLoader(), new AstAnalyzer(), new GitService())
     {
     }
 
@@ -42,25 +37,85 @@ public class EvolutionService : IEvolutionService
 
     public async Task<EvolveResult> EvolveAsync(string prompt, Role currentRole)
     {
-        Console.WriteLine($"[Evolúció] Új funkció generálása: '{prompt}' (Szerepkör: {currentRole})...");
+        Console.WriteLine($"[Evolúció] Új kérés feldolgozása: '{prompt}' ({currentRole})...");
 
-        var aiResponse = await _aiService.GenerateFeatureAsync(prompt, currentRole);
+        string? history = null;
+        int maxAttempts = 3;
 
-        if (string.IsNullOrWhiteSpace(aiResponse.SourceCode))
+        for (int attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            return new EvolveResult
+            if (attempt > 1)
             {
-                IsSuccess = false,
-                ErrorMessage = "A generált kód üres volt."
-            };
+                Console.WriteLine($"[Evolúció - Self-Healing] Újrapróbálkozás ({attempt}/{maxAttempts}) az előző fordítási hiba kijavításával...");
+            }
+
+            var aiResponse = await _aiService.GenerateFeatureAsync(prompt, currentRole, history);
+
+            // 1. RBAC Guardrail elutasítás: Nem mentjük lelemezként!
+            if (aiResponse.Action == "REJECT")
+            {
+                Console.WriteLine("[Evolúció] RBAC elutasítás. Nincs fájlmentés.");
+                return new EvolveResult
+                {
+                    IsSuccess = false,
+                    IsRejectedAction = true,
+                    ViewName = aiResponse.ViewName ?? "Hozzáférés Megtagadva",
+                    Description = aiResponse.Description ?? "Nincs jogosultsága ehhez a művelethez.",
+                    ErrorMessage = "❌ Hozzáférés megtagadva! (RBAC hiba)"
+                };
+            }
+
+            // 2. AI által kért törlés kezelése
+            if (aiResponse.Action == "DELETE" && !string.IsNullOrWhiteSpace(aiResponse.ViewName))
+            {
+                string evolDir = PathHelper.GetEvolViewsDirectory();
+                var matchedFiles = Directory.GetFiles(evolDir, $"*{aiResponse.ViewName}*.cs");
+
+                foreach (var file in matchedFiles)
+                {
+                    await DiscardFeatureAsync(file);
+                    await _gitService.RemoveAndPushAsync(file, $"[AI Törlés] {aiResponse.ViewName} eltávolítva.");
+                }
+
+                return new EvolveResult
+                {
+                    IsSuccess = true,
+                    IsDeletedAction = true,
+                    ViewName = aiResponse.ViewName,
+                    Description = "A kijelölt funkció törölve lett."
+                };
+            }
+
+            if (string.IsNullOrWhiteSpace(aiResponse.SourceCode))
+            {
+                return new EvolveResult
+                {
+                    IsSuccess = false,
+                    ErrorMessage = "A generált kód üres volt."
+                };
+            }
+
+            var result = await EvolveFeatureAsync(
+                aiResponse.ViewName ?? "Új Nézet", 
+                aiResponse.Description ?? "AI által generált funkció", 
+                aiResponse.SourceCode, 
+                aiResponse.TestCode ?? string.Empty
+            );
+
+            if (result.IsSuccess)
+            {
+                return result;
+            }
+
+            history = result.ErrorMessage;
+            Console.WriteLine($"[Evolúció - Fordítási Hiba az {attempt}. próbálkozásnál]: {history}");
         }
 
-        return await EvolveFeatureAsync(
-            aiResponse.ViewName ?? "Új Nézet", 
-            aiResponse.Description ?? "AI által generált funkció", 
-            aiResponse.SourceCode, 
-            aiResponse.TestCode ?? string.Empty
-        );
+        return new EvolveResult
+        {
+            IsSuccess = false,
+            ErrorMessage = $"Nem sikerült lefordítani a kért funkciót {maxAttempts} próbálkozás után sem. Utolsó hiba: {history}"
+        };
     }
 
     public async Task<EvolveResult> EvolveFeatureAsync(string viewName, string description, string sourceCode, string testCode)
@@ -74,7 +129,6 @@ public class EvolutionService : IEvolutionService
             };
         }
 
-        // 1. Biztonsági elemzés
         if (!_astAnalyzer.IsCodeSafe(sourceCode, out string securityViolation))
         {
             Console.WriteLine($"[Evolúció - Biztonsági Hiba] {securityViolation}");
@@ -93,16 +147,28 @@ public class EvolutionService : IEvolutionService
             safeViewName = $"EvolView_{Guid.NewGuid():N}";
         }
 
+        // Duplikáció szűrés: Töröljük a korábbi meglévő változatot az azonos témájú fájlokból, hogy ne legyenek duplikált fülek
+        var basePrefix = safeViewName.Split('_')[0];
+        var existingFiles = Directory.GetFiles(evolViewsDirectory, $"*{basePrefix}*.cs");
+        foreach (var oldFile in existingFiles)
+        {
+            try
+            {
+                Console.WriteLine($"[Evolúció - Módosítás/Takarítás] Korábbi változat törlése: {oldFile}");
+                File.Delete(oldFile);
+            }
+            catch
+            {
+                // Csendben figyelmen kívül hagyjuk
+            }
+        }
+
         string filePath = Path.Combine(evolViewsDirectory, $"{safeViewName}.cs");
 
-        // 2. Ideiglenes mentés a lemezre a betöltéshez
         await File.WriteAllTextAsync(filePath, sourceCode);
-        Console.WriteLine($"[Evolúció] Forráskód ideiglenesen elmentve: {filePath}");
 
-        // 3. Dinamikus Roslyn fordítás
         var loadResult = _dynamicLoader.LoadViewFromCode(sourceCode);
 
-        // 4. HA A FORDÍTÁS SIKERTELEN: Azonnal töröljük a fájlt a lemezről, hogy ne hagyjon hátra hibás kódot!
         if (!loadResult.IsSuccess)
         {
             Console.WriteLine($"[Evolúció - Fordítási Hiba] A kód nem fordult le. Fájl törlése: {filePath}");
@@ -113,9 +179,9 @@ public class EvolutionService : IEvolutionService
                     File.Delete(filePath);
                 }
             }
-            catch (Exception delEx)
+            catch (Exception ex)
             {
-                Console.WriteLine($"[Takarítási hiba]: {delEx.Message}");
+                Console.WriteLine($"[Takarítási hiba]: {ex.Message}");
             }
 
             return new EvolveResult
@@ -125,8 +191,6 @@ public class EvolutionService : IEvolutionService
             };
         }
 
-        // FONTOS: Az automatikus Git push kikerült! 
-        // A fájl csak előnézetként jelenik meg a felületen.
         return new EvolveResult
         {
             IsSuccess = true,
@@ -138,6 +202,25 @@ public class EvolutionService : IEvolutionService
         };
     }
 
+    public async Task<bool> DiscardFeatureAsync(string filePath)
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(filePath) && File.Exists(filePath))
+            {
+                Console.WriteLine($"[Evolúció - Elvetés] A funkció törlése a lemezről: {filePath}");
+                File.Delete(filePath);
+                return true;
+            }
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Elvetési hiba]: {ex.Message}");
+            return false;
+        }
+    }
+
     public async Task<bool> AcceptAndPushFeatureAsync(string filePath, string viewName)
     {
         if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
@@ -146,7 +229,7 @@ public class EvolutionService : IEvolutionService
             return false;
         }
 
-        Console.WriteLine($"[Evolúció - Elfogadás] A felhasználó elfogadta a funkciót ('{viewName}'). Szinkronizáció indítása...");
+        Console.WriteLine($"[Evolúció - Elfogadás] A funkció elfogadva ('{viewName}'). Git push indítása...");
 
         try
         {
