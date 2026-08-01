@@ -1,45 +1,173 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System.Linq;
 
 namespace Kreta.Services.Security;
 
-/// <summary>
-/// Roslyn AST elemző a generált C# kód biztonsági átvizsgálásához.
-/// </summary>
 public class AstAnalyzer
 {
-    public bool IsCodeSafe(string sourceCode, out string violation)
+    // CSAK EZEK A NÉVTÉROK ÉS TÍPUSOK HASZNÁLHATÓAK A GENERÁLT KÓDBAN
+    private static readonly HashSet<string> AllowedNamespaces = new(StringComparer.Ordinal)
     {
-        violation = string.Empty;
+        "System",
+        "System.Collections.Generic",
+        "System.Linq",
+        "System.Text",
+        "Avalonia",
+        "Avalonia.Controls",
+        "Avalonia.Controls.Primitives",
+        "Avalonia.Controls.Templates",
+        "Avalonia.Layout",
+        "Avalonia.Media",
+        "Avalonia.Interactivity",
+        "Kreta.Core",
+        "Kreta.Contexts",
+        "Kreta.Dynamic"
+    };
+
+    // EXPLICIT TILTOTT METÓDUSOK ÉS TÍPUSOK (MÉG HA REFL-EL VAGY TRÜKKÖSEN PRÓBÁLKOZNA IS)
+    private static readonly HashSet<string> BannedTypesAndMethods = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Process", "Assembly", "MethodInfo", "MemberInfo", "FieldInfo", "PropertyInfo",
+        "Type", "Activator", "Environment", "File", "Directory", "Path", "Stream",
+        "StreamReader", "StreamWriter", "HttpClient", "WebClient", "Socket", "GC",
+        "Marshal", "Unsafe", "Task", "Thread", "ThreadPool"
+    };
+
+    public bool IsCodeSafe(string sourceCode, out string violationMessage)
+    {
+        violationMessage = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(sourceCode))
+        {
+            violationMessage = "A kapott forráskód üres.";
+            return false;
+        }
 
         try
         {
-            var tree = CSharpSyntaxTree.ParseText(sourceCode);
-            var root = tree.GetRoot();
+            SyntaxTree tree = CSharpSyntaxTree.ParseText(sourceCode);
+            SyntaxNode root = tree.GetRoot();
 
+            // 1. UNSAFE KÓD ÉS MUTEATÓK TILTÁSA
+            if (root.DescendantNodes().OfType<UnsafeStatementSyntax>().Any() ||
+                root.DescendantTokens().Any(t => t.IsKind(SyntaxKind.UnsafeKeyword)))
+            {
+                violationMessage = "Biztonsági hiba: 'unsafe' kódblokk használata szigorúan tiltott!";
+                return false;
+            }
+
+            // 2. USING UTASÍTÁSOK ELLENŐRZÉSE (NÉVTÉR WHITELIST)
+            var usingDirectives = root.DescendantNodes().OfType<UsingDirectiveSyntax>();
+            foreach (var usingDir in usingDirectives)
+            {
+                string ns = usingDir.Name?.ToString() ?? string.Empty;
+                if (!IsNamespaceAllowed(ns))
+                {
+                    violationMessage = $"Biztonsági hiba: Nem engedélyezett névtér használata: 'using {ns};'";
+                    return false;
+                }
+            }
+
+            // 3. FULLY QUALIFIED NAMESPACES ELLENŐRZÉSE (Pl: System.Diagnostics.Process.Start)
+            var qualifiedNames = root.DescendantNodes().OfType<QualifiedNameSyntax>();
+            foreach (var qn in qualifiedNames)
+            {
+                string fullName = qn.ToString();
+                if (IsBannedName(fullName))
+                {
+                    violationMessage = $"Biztonsági hiba: Tiltott típus/névtér hivatkozás észlelve: '{fullName}'";
+                    return false;
+                }
+            }
+
+            // 4. REFLECTION ÉS DINAMIKUS TÍPUSOK TILTÁSA (typeof, GetType, dynamic)
+            var typeOfExpressions = root.DescendantNodes().OfType<TypeOfExpressionSyntax>();
+            if (typeOfExpressions.Any())
+            {
+                violationMessage = "Biztonsági hiba: 'typeof()' reflection használata tiltott!";
+                return false;
+            }
+
+            // DYNAMIC kulcsszó tiltása
+            var identifierNames = root.DescendantNodes().OfType<IdentifierNameSyntax>();
+            foreach (var id in identifierNames)
+            {
+                if (id.Identifier.Text == "dynamic")
+                {
+                    violationMessage = "Biztonsági hiba: 'dynamic' típus használata tiltott!";
+                    return false;
+                }
+
+                if (BannedTypesAndMethods.Contains(id.Identifier.Text))
+                {
+                    violationMessage = $"Biztonsági hiba: Tiltott típus/osztály használata észlelve: '{id.Identifier.Text}'";
+                    return false;
+                }
+            }
+
+            // 5. METÓDUSHÍVÁSOK ÉS NÉVTÉR CSERE (ALIAS) ELLENŐRZÉSE
             var invocationExpressions = root.DescendantNodes().OfType<InvocationExpressionSyntax>();
-
             foreach (var invocation in invocationExpressions)
             {
-                var methodCall = invocation.ToString();
+                string callText = invocation.Expression.ToString();
 
-                if (methodCall.Contains("Process.Start") || 
-                    methodCall.Contains("Assembly.Load") || 
-                    methodCall.Contains("Environment.Exit"))
+                // Ha a hívott elemben szerepel GetType, Invoke, Start, stb.
+                if (callText.EndsWith(".GetType") || 
+                    callText.EndsWith(".Invoke") || 
+                    callText.Contains("GetMethod") || 
+                    callText.Contains("GetProperty") ||
+                    callText.Contains("GetField"))
                 {
-                    violation = $"Tiltott metódushívás észlelve: {methodCall}";
+                    violationMessage = $"Biztonsági hiba: Reflection vagy dinamikus hívás észlelve: '{callText}'";
                     return false;
                 }
             }
 
             return true;
         }
-        catch (System.Exception ex)
+        catch (Exception ex)
         {
-            violation = $"AST Elemzési hiba: {ex.Message}";
+            violationMessage = $"A kód elemzése során szintaktikai/AST hiba történt: {ex.Message}";
             return false;
         }
+    }
+
+    private bool IsNamespaceAllowed(string ns)
+    {
+        if (AllowedNamespaces.Contains(ns))
+            return true;
+
+        // Engedélyezzük az Avalonia al-névtereket
+        if (ns.StartsWith("Avalonia.", StringComparison.Ordinal) && 
+            (ns.StartsWith("Avalonia.Controls", StringComparison.Ordinal) || 
+             ns.StartsWith("Avalonia.Layout", StringComparison.Ordinal) || 
+             ns.StartsWith("Avalonia.Media", StringComparison.Ordinal)))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool IsBannedName(string fullName)
+    {
+        foreach (var banned in BannedTypesAndMethods)
+        {
+            if (fullName.Contains(banned, StringComparison.OrdinalIgnoreCase) ||
+                fullName.StartsWith("System.Diagnostics", StringComparison.OrdinalIgnoreCase) ||
+                fullName.StartsWith("System.Reflection", StringComparison.OrdinalIgnoreCase) ||
+                fullName.StartsWith("System.IO", StringComparison.OrdinalIgnoreCase) ||
+                fullName.StartsWith("System.Net", StringComparison.OrdinalIgnoreCase) ||
+                fullName.StartsWith("System.Runtime", StringComparison.OrdinalIgnoreCase) ||
+                fullName.StartsWith("Microsoft.Win32", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 }
