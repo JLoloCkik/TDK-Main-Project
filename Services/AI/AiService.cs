@@ -16,7 +16,6 @@ public class AiService : IAiService
 {
     private readonly HttpClient _httpClient;
 
-    // Statikusan tároljuk a legutóbb működő modellt, hogy a következő kérésnél azonnal ezzel indítsunk
     private static string? _preferredVersion;
     private static string? _preferredModel;
 
@@ -115,7 +114,7 @@ public class AiService : IAiService
                     }
 
                     var response = await CallGeminiApiInternalAsync(prompt, role, history, apiKey, (string)attempt.Version, (string)attempt.Model);
-                    
+
                     _preferredVersion = attempt.Version;
                     _preferredModel = attempt.Model;
 
@@ -247,8 +246,13 @@ CRITICAL C# & AVALONIA COMPILATION RULES:
 6. TEXTBOX PLACEHOLDER: Use `TextBox.PlaceholderText` instead of `TextBox.Watermark`.
 7. NO 'Panel.Child': `StackPanel` does NOT have `.Child`! Use `.Children.Add(...)`. Only `Border` has `.Child`.
 8. GRID POSITIONING: Use static method `Grid.SetColumn(control, col)` and `Grid.SetRow(control, row)`.
-9. PARAMETERLESS CONSTRUCTOR: Always provide public parameterless constructor `public MyView() {{ }}` alongside context-injecting constructor.
-10. REQUIRED IMPORTS:
+9. PROPERTY OVERRIDE (CS0108): Always write `public new string Name => ""...""` to explicitly hide inherited StyledElement.Name and eliminate CS0108 warnings.
+10. NULLABLE CONTROL FIELDS (CS8618): Declare private UI fields as nullable (e.g. `private ListBox? _listBox;`) or initialize them at declaration (e.g. `private ListBox _listBox = new();`) to avoid CS8618 warnings.
+11. NO REUSED CONTROL INSTANCES: Instantiate all UI Controls (TextBlock, ListBox, Button, ComboBox, etc.) directly INSIDE the `CreateView()` method so every call to `CreateView()` builds a fresh UI tree without ""already has a visual parent"" Avalonia errors.
+12. CONSTRUCTORS & DATA FETCHING:
+    - Always provide a context-injecting constructor `public MyView(IStudentContext context)` (or ITeacherContext / IDirectorContext).
+    - Always provide a public parameterless constructor `public MyView() {{ }}`.
+13. REQUIRED IMPORTS:
    using System;
    using System.Collections.Generic;
    using System.Linq;
@@ -259,12 +263,11 @@ CRITICAL C# & AVALONIA COMPILATION RULES:
    using Avalonia.Media;
    using Kreta.Core;
    using Kreta.Contexts;
-11. UNIQUE CLASS NAME: Inherit `UserControl` and implement `IEvolView`.
-12. IEvolView INTERFACE:
-   - `public string Name => ""A funkció magyar neve"";`
+14. IEvolView INTERFACE:
+   - `public new string Name => ""A funkció magyar neve"";`
    - `public string Description => ""Rövid magyar leírás"";`
    - `public Control CreateView()`
-13. KEEP C# SHORT & SIMPLE (Under 100 lines) so it easily fits within response token limits!
+15. KEEP C# SHORT & SIMPLE (Under 100 lines) so it easily fits within response token limits!
 
 =========================================
 SECURITY GUARDRAILS:
