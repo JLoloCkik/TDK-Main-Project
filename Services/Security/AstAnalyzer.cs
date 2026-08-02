@@ -52,15 +52,13 @@ public class AstAnalyzer
             SyntaxTree tree = CSharpSyntaxTree.ParseText(sourceCode);
             SyntaxNode root = tree.GetRoot();
 
-            // 1. UNSAFE KÓD ÉS MUTEATÓK TILTÁSA
             if (root.DescendantNodes().OfType<UnsafeStatementSyntax>().Any() ||
                 root.DescendantTokens().Any(t => t.IsKind(SyntaxKind.UnsafeKeyword)))
             {
                 violationMessage = "Biztonsági hiba: 'unsafe' kódblokk használata szigorúan tiltott!";
                 return false;
             }
-
-            // 2. USING UTASÍTÁSOK ELLENŐRZÉSE (NÉVTÉR WHITELIST)
+         
             var usingDirectives = root.DescendantNodes().OfType<UsingDirectiveSyntax>();
             foreach (var usingDir in usingDirectives)
             {
@@ -71,8 +69,7 @@ public class AstAnalyzer
                     return false;
                 }
             }
-
-            // 3. FULLY QUALIFIED NAMESPACES ELLENŐRZÉSE (Pl: System.Diagnostics.Process.Start)
+            
             var qualifiedNames = root.DescendantNodes().OfType<QualifiedNameSyntax>();
             foreach (var qn in qualifiedNames)
             {
@@ -84,15 +81,13 @@ public class AstAnalyzer
                 }
             }
 
-            // 4. REFLECTION ÉS DINAMIKUS TÍPUSOK TILTÁSA (typeof, GetType, dynamic)
             var typeOfExpressions = root.DescendantNodes().OfType<TypeOfExpressionSyntax>();
             if (typeOfExpressions.Any())
             {
                 violationMessage = "Biztonsági hiba: 'typeof()' reflection használata tiltott!";
                 return false;
             }
-
-            // DYNAMIC kulcsszó tiltása
+            
             var identifierNames = root.DescendantNodes().OfType<IdentifierNameSyntax>();
             foreach (var id in identifierNames)
             {
@@ -109,7 +104,6 @@ public class AstAnalyzer
                 }
             }
 
-            // 5. METÓDUSHÍVÁSOK ÉS NÉVTÉR CSERE (ALIAS) ELLENŐRZÉSE
             var invocationExpressions = root.DescendantNodes().OfType<InvocationExpressionSyntax>();
             foreach (var invocation in invocationExpressions)
             {
@@ -141,7 +135,7 @@ public class AstAnalyzer
         if (AllowedNamespaces.Contains(ns))
             return true;
 
-        // Engedélyezzük az Avalonia al-névtereket
+
         if (ns.StartsWith("Avalonia.", StringComparison.Ordinal) && 
             (ns.StartsWith("Avalonia.Controls", StringComparison.Ordinal) || 
              ns.StartsWith("Avalonia.Layout", StringComparison.Ordinal) || 
