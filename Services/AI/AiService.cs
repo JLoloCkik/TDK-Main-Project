@@ -10,13 +10,14 @@ using Kreta.Core;
 namespace Kreta.Services.AI;
 
 /// <summary>
-/// Gemini API kapcsolatot, Formális Prompt Refiner elő-szűrést, meglévő nézetek kontextus-elemzését 
-/// és C# UI kódgenerálást végző szolgáltatás.
+/// Gemini API kapcsolatot, Formális Prompt Refiner elő-szűrést, Prompt-to-Code Conformance ellenőrzést,
+/// meglévő nézetek kontextus-elemzését és C# UI kódgenerálást végző szolgáltatás.
 /// </summary>
 public class AiService : IAiService
 {
     private readonly HttpClient _httpClient;
     private readonly IPromptRefinerService _promptRefiner;
+    private readonly IPromptConformanceVerifier _conformanceVerifier;
 
     private static string? _preferredVersion;
     private static string? _preferredModel;
@@ -25,6 +26,7 @@ public class AiService : IAiService
     {
         _httpClient = new HttpClient();
         _promptRefiner = new PromptRefinerService(_httpClient);
+        _conformanceVerifier = new PromptConformanceVerifier();
 
         try
         {
@@ -139,6 +141,13 @@ public class AiService : IAiService
                     _preferredModel = attempt.Model;
 
                     Console.WriteLine($"[AI Kapcsolat] SIKERES! Használt végpont: {attempt.Version}/{attempt.Model}");
+
+                    // 🟢 3. LÉPÉS: Prompt-to-Code Conformance Verification (AST alapon)
+                    if (!string.IsNullOrEmpty(response.SourceCode) && response.Action != "DELETE" && response.Action != "REJECT")
+                    {
+                        _conformanceVerifier.VerifyConformance(response.SourceCode, formalSpec);
+                    }
+
                     return response;
                 }
                 catch (Exception ex)
