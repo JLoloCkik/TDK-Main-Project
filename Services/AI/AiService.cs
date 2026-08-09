@@ -10,11 +10,13 @@ using Kreta.Core;
 namespace Kreta.Services.AI;
 
 /// <summary>
-/// Gemini API kapcsolatot, meglévő nézetek kontextus-elemzését és C# UI kódgenerálást végző szolgáltatás.
+/// Gemini API kapcsolatot, Formális Prompt Refiner elő-szűrést, meglévő nézetek kontextus-elemzését 
+/// és C# UI kódgenerálást végző szolgáltatás.
 /// </summary>
 public class AiService : IAiService
 {
     private readonly HttpClient _httpClient;
+    private readonly IPromptRefinerService _promptRefiner;
 
     private static string? _preferredVersion;
     private static string? _preferredModel;
@@ -22,6 +24,7 @@ public class AiService : IAiService
     public AiService()
     {
         _httpClient = new HttpClient();
+        _promptRefiner = new PromptRefinerService(_httpClient);
 
         try
         {
@@ -70,6 +73,23 @@ public class AiService : IAiService
                 "export GEMINI_API_KEY=\"a_te_kulcsod_itt\" && dotnet run");
         }
 
+        // 1. LÉPÉS: Formális Prompt Refiner előfeldolgozás
+        var formalSpec = await _promptRefiner.RefinePromptAsync(prompt, role, apiKey);
+
+        // 2. LÉPÉS: Korai RBAC elutasítás ellenőrzése
+        if (formalSpec.IsRoleViolating)
+        {
+            Console.WriteLine($"[RBAC Guardrail] Elutasítva: {formalSpec.ViolationReason}");
+            return new AiEvolveResponse
+            {
+                ViewName = "Hozzáférés Megtagadva",
+                Description = formalSpec.ViolationReason,
+                Action = "REJECT",
+                SourceCode = string.Empty,
+                TestCode = string.Empty
+            };
+        }
+
         var defaultMatrix = new[]
         {
             new { Version = "v1beta", Model = "gemini-2.5-pro" },
@@ -113,7 +133,7 @@ public class AiService : IAiService
                         Console.WriteLine($"[AI Kapcsolat] Megkísérlés: {attempt.Version} - {attempt.Model}...");
                     }
 
-                    var response = await CallGeminiApiInternalAsync(prompt, role, history, apiKey, (string)attempt.Version, (string)attempt.Model);
+                    var response = await CallGeminiApiInternalAsync(prompt, role, formalSpec, history, apiKey, (string)attempt.Version, (string)attempt.Model);
 
                     _preferredVersion = attempt.Version;
                     _preferredModel = attempt.Model;
@@ -192,8 +212,8 @@ public class AiService : IAiService
         }
     }
 
-    private async Task<AiEvolveResponse> CallGeminiApiInternalAsync(string prompt, Role role, string? history,
-        string apiKey, string apiVersion, string modelName)
+    private async Task<AiEvolveResponse> CallGeminiApiInternalAsync(string prompt, Role role,
+        FormalPromptSpecification spec, string? history, string apiKey, string apiVersion, string modelName)
     {
         var url =
             $"https://generativelanguage.googleapis.com/{apiVersion}/models/{modelName}:generateContent?key={apiKey}";
@@ -205,6 +225,20 @@ public class AiService : IAiService
 Your objective is to generate, MODIFY, or DELETE safe, compile-safe, and strictly role-appropriate C# code for dynamic views.
 
 ACTIVE USER ROLE: {role}
+
+=========================================
+FORMAL SPECIFICATION CONTRACT (MUST BE STRICTLY FOLLOWED):
+=========================================
+- Target Role: {spec.TargetRole}
+- Normalized Intent: {spec.NormalizedIntent}
+- Required Features: {string.Join(", ", spec.RequestedFeatures)}
+- Mandatory Context Methods: {string.Join(", ", spec.RequiredContextMethods)}
+- Prohibited Methods/Actions: {string.Join(", ", spec.ForbiddenContextMethods)}
+
+SPECIFICATION CONFORMANCE RULES:
+1. Implement EXACTLY the required features in C#. Do NOT add unrequested buttons, unrequested context calls, or extra fields.
+2. Do NOT omit any requested features.
+3. If a method is in Prohibited Methods, you MUST NOT call it under any circumstances.
 
 {existingViewsContext}
 
@@ -219,40 +253,25 @@ INSTRUCTIONS FOR MODIFYING OR DELETING EXISTING VIEWS:
 =========================================
 AVAILABLE CLASSES AND INTERFACES (CRITICAL FOR C# COMPILATION):
 =========================================
-- `Role` Enum: Student, Teacher, Director.
-- `User` Class: int Id, string Name, Role Role, string ClassName. (WARNING: NO 'Email' property exists in User class!).
-- `Grade` Class: int Id, int StudentId, int SubjectId, int Value, DateTime Date, User? Student, Subject? Subject. (WARNING: NO 'Weight' property exists in Grade class!).
-- `Subject` Class: int Id, string Name.
-- `Lesson` Class: int Id, string ClassName, string SubjectName, string Room, DateTime Date.
-- `IStudentContext` Interface: List<Grade> GetMyGrades(); User? GetMyProfile(); List<Lesson> GetMyLessons();
-- `ITeacherContext` Interface: List<User> GetMyClassStudents(); void AddGrade(int studentId, Grade grade); List<Subject> GetAllSubjects(); List<string> GetAllClasses(); List<Lesson> GetLessons(); void AddLesson(Lesson lesson);
-- `IDirectorContext` Interface: List<User> GetAllUsers(); void CreateUser(User newUser); void DeleteUser(int userId); List<string> GetAllClasses(); void AssignClassToStudent(int studentId, string className);
+- `Role` Enum: Student, Teacher, Director. (Namespace: Kreta.Core)
+- `User` Class: int Id, string Name, Role Role, string ClassName. (Namespace: Kreta.Core)
+- `Grade` Class: int Id, int StudentId, int SubjectId, int Value, DateTime Date, User? Student, Subject? Subject. (Namespace: Kreta.Core)
+- `Subject` Class: int Id, string Name. (Namespace: Kreta.Core)
+- `Lesson` Class: int Id, string ClassName, string SubjectName, string Room, DateTime Date. (Namespace: Kreta.Core)
+- `IEvolView` Interface: MUST BE IMPLEMENTED BY ALL GENERATED VIEWS! (Namespace: Kreta.Core)
+- `IStudentContext` Interface: List<Grade> GetMyGrades(); User? GetMyProfile(); List<Lesson> GetMyLessons(); (Namespace: Kreta.Contexts)
+- `ITeacherContext` Interface: List<User> GetMyClassStudents(); void AddGrade(int studentId, Grade grade); List<Subject> GetAllSubjects(); List<string> GetAllClasses(); List<Lesson> GetLessons(); void AddLesson(Lesson lesson); (Namespace: Kreta.Contexts)
+- `IDirectorContext` Interface: List<User> GetAllUsers(); void CreateUser(User newUser); void DeleteUser(int userId); List<string> GetAllClasses(); void AssignClassToStudent(int studentId, string className); (Namespace: Kreta.Contexts)
 
 =========================================
-ROLE-BASED ACCESS CONTROL (RBAC) MATRIX:
+CRITICAL C# STRING & VARIABLE SYNTAX RULES:
 =========================================
-1. ROLE: Director (Igazgató) - Global access to school functions and administration.
-2. ROLE: Teacher (Tanár) - Strictly restricted to class and subject teaching. CANNOT access IDirectorContext.
-3. ROLE: Student (Diák) - Read-only personal student data. CANNOT access ITeacherContext or IDirectorContext.
-
-=========================================
-CRITICAL C# & AVALONIA COMPILATION RULES:
-=========================================
-1. NO TOP-LEVEL STATEMENTS: Everything inside class declarations.
-2. NO 'Student' TYPE: Use 'User' where 'user.Role == Role.Student'.
-3. NO 'Weight' PROPERTY on Grade.
-4. NO DATAGRID or FuncDataTemplate. For ListBox/ComboBox, set `ItemsSource = myCollection.Select(u => $""{{u.Name}} ({{u.Role}})"").ToList()`.
-5. AVALONIA CONTROL ITEMS PROPERTY IS READ-ONLY: Use `comboBox.ItemsSource = ...` or `listBox.ItemsSource = ...`.
-6. TEXTBOX PLACEHOLDER: Use `TextBox.PlaceholderText` instead of `TextBox.Watermark`.
-7. NO 'Panel.Child': `StackPanel` does NOT have `.Child`! Use `.Children.Add(...)`. Only `Border` has `.Child`.
-8. GRID POSITIONING: Use static method `Grid.SetColumn(control, col)` and `Grid.SetRow(control, row)`.
-9. PROPERTY OVERRIDE (CS0108): Always write `public new string Name => ""...""` to explicitly hide inherited StyledElement.Name and eliminate CS0108 warnings.
-10. NULLABLE CONTROL FIELDS (CS8618): Declare private UI fields as nullable (e.g. `private ListBox? _listBox;`) or initialize them at declaration (e.g. `private ListBox _listBox = new();`) to avoid CS8618 warnings.
-11. NO REUSED CONTROL INSTANCES: Instantiate all UI Controls (TextBlock, ListBox, Button, ComboBox, etc.) directly INSIDE the `CreateView()` method so every call to `CreateView()` builds a fresh UI tree without ""already has a visual parent"" Avalonia errors.
-12. CONSTRUCTORS & DATA FETCHING:
-    - Always provide a context-injecting constructor `public MyView(IStudentContext context)` (or ITeacherContext / IDirectorContext).
-    - Always provide a public parameterless constructor `public MyView() {{ }}`.
-13. REQUIRED IMPORTS:
+1. ASCII VARIABLE NAMES ONLY: Use 'atlag', 'ujJegy', 'tantargy', 'atlagText' instead of 'átlag', 'újJegy', 'tantárgy'! NEVER use Hungarian accented characters (á, é, í, ó, ö, ő, ú, ü, ű) in C# variable names, fields, method names, or labels!
+2. SINGLE-LINE STRINGS ONLY: Every UI text string literal must be strictly on a single line (e.g., ""Varhato atlag: "" + atlag.ToString(""F2"")). Never split string literals across multiple lines without '+' concatenation.
+3. EXPLICIT RETURN STATEMENT: The `CreateView()` method MUST end with an explicit return statement (e.g. `return mainStackPanel;` or `return mainBorder;`) on ALL code paths!
+4. INTERFACE TO IMPLEMENT: You MUST implement `IEvolView` ONLY. Do NOT use non-existent interfaces like `IView`, `IAiView`, `IEvolutionView`!
+5. NO NON-EXISTENT NAMESPACES: Do NOT use `Kreta.Core.Interfaces`, `Kreta.Contexts.Interfaces`, `System.Globalization`.
+6. MANDATORY USINGS AT THE TOP OF THE C# FILE:
    using System;
    using System.Collections.Generic;
    using System.Linq;
@@ -263,11 +282,22 @@ CRITICAL C# & AVALONIA COMPILATION RULES:
    using Avalonia.Media;
    using Kreta.Core;
    using Kreta.Contexts;
-14. IEvolView INTERFACE:
+7. NO DATAGRID or FuncDataTemplate. For ListBox/ComboBox, set `ItemsSource = myCollection.Select(u => $""{{u.Name}} ({{u.Role}})"").ToList()`.
+8. AVALONIA CONTROL ITEMS PROPERTY IS READ-ONLY: Use `comboBox.ItemsSource = ...` or `listBox.ItemsSource = ...`.
+9. TEXTBOX PLACEHOLDER: Use `TextBox.PlaceholderText` instead of `TextBox.Watermark`.
+10. NO 'Panel.Child': `StackPanel` does NOT have `.Child`! Use `.Children.Add(...)`. Only `Border` has `.Child`.
+11. GRID POSITIONING: Use static method `Grid.SetColumn(control, col)` and `Grid.SetRow(control, row)`.
+12. PROPERTY OVERRIDE (CS0108): Always write `public new string Name => ""...""` to explicitly hide inherited StyledElement.Name and eliminate CS0108 warnings.
+13. NULLABLE CONTROL FIELDS (CS8618): Declare private UI fields as nullable (e.g. `private ListBox? _listBox;`) or initialize them at declaration (e.g. `private ListBox _listBox = new();`) to avoid CS8618 warnings.
+14. NO REUSED CONTROL INSTANCES: Instantiate all UI Controls directly INSIDE the `CreateView()` method so every call builds a fresh UI tree without ""already has a visual parent"" errors.
+15. CONSTRUCTORS & DATA FETCHING:
+    - Always provide a context-injecting constructor `public MyView(IStudentContext context)` (or ITeacherContext / IDirectorContext).
+    - Always provide a public parameterless constructor `public MyView() {{ }}`.
+16. IEvolView INTERFACE MEMBERS:
    - `public new string Name => ""A funkció magyar neve"";`
    - `public string Description => ""Rövid magyar leírás"";`
    - `public Control CreateView()`
-15. KEEP C# SHORT & SIMPLE (Under 100 lines) so it easily fits within response token limits!
+17. KEEP C# SHORT & SIMPLE (Under 100 lines) so it easily fits within response token limits!
 
 =========================================
 SECURITY GUARDRAILS:
@@ -293,7 +323,7 @@ Ez alapján generálj EGY EGYSZERŰBB, RÖVIDEBB C# kódot, ami ezt kiküszöbli
         {
             contents = new[]
             {
-                new { parts = new[] { new { text = $"Role: {role}. Prompt: {prompt}" } } }
+                new { parts = new[] { new { text = $"Role: {role}. Normalized Spec: {spec.NormalizedIntent}. Original Prompt: {prompt}" } } }
             },
             systemInstruction = new
             {
@@ -403,10 +433,7 @@ Ez alapján generálj EGY EGYSZERŰBB, RÖVIDEBB C# kódot, ami ezt kiküszöbli
 
             if (!string.IsNullOrEmpty(result.SourceCode))
             {
-                result.SourceCode = result.SourceCode
-                    .Replace("\\n", "\n")
-                    .Replace("\\r", "\r")
-                    .Replace("\\\"", "\"");
+                result.SourceCode = result.SourceCode.Replace("\r\n", "\n").Replace("\r", "\n");
             }
 
             return result;

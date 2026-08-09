@@ -33,7 +33,7 @@ public class KretaDbContext : DbContext
                 new User { Id = 1, Name = "Kovács János", Role = Role.Student, ClassName = "9.A" },
                 new User { Id = 2, Name = "Nagy Anna", Role = Role.Student, ClassName = "9.A" },
                 new User { Id = 3, Name = "Szabó Mária", Role = Role.Teacher, ClassName = "9.A" },
-                new User { Id = 4, Name = "Nagy Péter", Role = Role.Director, ClassName = "9A" }
+                new User { Id = 4, Name = "Nagy Péter", Role = Role.Director, ClassName = "9.A" }
             );
             SaveChanges();
         }
