@@ -157,7 +157,7 @@ public class PromptConformanceVerifier : IPromptConformanceVerifier
             
             if (spec.TargetRole.Equals("Student", StringComparison.OrdinalIgnoreCase))
             {
-                var studentForbiddenList = new[] { "AddGrade", "CreateUser", "DeleteUser", "AssignClassToStudent", "AddLesson" };
+                var studentForbiddenList = new[] { "AddGrade", "CreateUser", "DeleteUser", "AssignClassToStudent", "AddLesson", "SaveEntity", "DeleteEntity" };
                 foreach (var forbidden in studentForbiddenList)
                 {
                     if (identifiedCalls.Contains(forbidden) && !result.DetectedForbiddenCalls.Contains(forbidden))

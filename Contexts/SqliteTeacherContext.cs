@@ -50,4 +50,53 @@ public class SqliteTeacherContext : ITeacherContext
         _dbContext.Lessons.Add(lesson);
         _dbContext.SaveChanges();
     }
+
+    public List<GenericRecord> QueryEntities(string entityType)
+    {
+        return _dbContext.GenericRecords
+            .Where(r => r.EntityType == entityType)
+            .OrderByDescending(r => r.CreatedAt)
+            .ToList();
+    }
+
+    public GenericRecord? GetEntity(string entityType, int id)
+    {
+        return _dbContext.GenericRecords
+            .FirstOrDefault(r => r.EntityType == entityType && r.Id == id);
+    }
+
+    public int SaveEntity(string entityType, Dictionary<string, string> data, int? id = null)
+    {
+        var record = id.HasValue
+            ? _dbContext.GenericRecords.FirstOrDefault(r => r.EntityType == entityType && r.Id == id.Value)
+            : null;
+
+        if (record == null)
+        {
+            record = new GenericRecord
+            {
+                EntityType = entityType,
+                CreatedByRole = Role.Teacher,
+                Data = data
+            };
+            _dbContext.GenericRecords.Add(record);
+        }
+        else
+        {
+            record.Data = data;
+        }
+
+        _dbContext.SaveChanges();
+        return record.Id;
+    }
+
+    public void DeleteEntity(string entityType, int id)
+    {
+        var record = _dbContext.GenericRecords.FirstOrDefault(r => r.EntityType == entityType && r.Id == id);
+        if (record != null)
+        {
+            _dbContext.GenericRecords.Remove(record);
+            _dbContext.SaveChanges();
+        }
+    }
 }

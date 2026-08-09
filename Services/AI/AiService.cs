@@ -135,7 +135,8 @@ public class AiService : IAiService
                         Console.WriteLine($"[AI Kapcsolat] Megkísérlés: {attempt.Version} - {attempt.Model}...");
                     }
 
-                    var response = await CallGeminiApiInternalAsync(prompt, role, formalSpec, history, apiKey, (string)attempt.Version, (string)attempt.Model);
+                    var response = await CallGeminiApiInternalAsync(prompt, role, formalSpec, history, apiKey,
+                        (string)attempt.Version, (string)attempt.Model);
 
                     _preferredVersion = attempt.Version;
                     _preferredModel = attempt.Model;
@@ -143,7 +144,8 @@ public class AiService : IAiService
                     Console.WriteLine($"[AI Kapcsolat] SIKERES! Használt végpont: {attempt.Version}/{attempt.Model}");
 
                     // 🟢 3. LÉPÉS: Prompt-to-Code Conformance Verification (AST alapon)
-                    if (!string.IsNullOrEmpty(response.SourceCode) && response.Action != "DELETE" && response.Action != "REJECT")
+                    if (!string.IsNullOrEmpty(response.SourceCode) && response.Action != "DELETE" &&
+                        response.Action != "REJECT")
                     {
                         _conformanceVerifier.VerifyConformance(response.SourceCode, formalSpec);
                     }
@@ -168,7 +170,8 @@ public class AiService : IAiService
                     }
 
                     if (retry < maxRetries - 1 && (ex.Message.Contains("503") || ex.Message.Contains("429") ||
-                                                   ex.Message.Contains("Hálózati hiba") || ex.Message.Contains("MAX_TOKENS")))
+                                                   ex.Message.Contains("Hálózati hiba") ||
+                                                   ex.Message.Contains("MAX_TOKENS")))
                     {
                         Console.WriteLine(
                             $"[AI Kapcsolat] Átmeneti hiba észlelve. Várakozás {delayMs} ms-ig az újrapróbálkozás előtt...");
@@ -213,6 +216,7 @@ public class AiService : IAiService
                     sb.AppendLine($"  Kód: {content}\n");
                 }
             }
+
             return sb.ToString();
         }
         catch
@@ -224,13 +228,11 @@ public class AiService : IAiService
     private async Task<AiEvolveResponse> CallGeminiApiInternalAsync(string prompt, Role role,
         FormalPromptSpecification spec, string? history, string apiKey, string apiVersion, string modelName)
     {
-        var url =
-            $"https://generativelanguage.googleapis.com/{apiVersion}/models/{modelName}:generateContent?key={apiKey}";
+        var url = $"https://generativelanguage.googleapis.com/{apiVersion}/models/{modelName}:generateContent?key={apiKey}";
 
         var existingViewsContext = GetExistingViewsContext();
 
-        var systemInstruction =
-            $@"You are the automated C# and Avalonia UI compiler-agent for ""EvolKréta"", a self-evolving educational system.
+        var systemInstruction = $@"You are the automated C# and Avalonia UI compiler-agent for ""EvolKréta"", a self-evolving educational system.
 Your objective is to generate, MODIFY, or DELETE safe, compile-safe, and strictly role-appropriate C# code for dynamic views.
 
 ACTIVE USER ROLE: {role}
@@ -268,9 +270,22 @@ AVAILABLE CLASSES AND INTERFACES (CRITICAL FOR C# COMPILATION):
 - `Subject` Class: int Id, string Name. (Namespace: Kreta.Core)
 - `Lesson` Class: int Id, string ClassName, string SubjectName, string Room, DateTime Date. (Namespace: Kreta.Core)
 - `IEvolView` Interface: MUST BE IMPLEMENTED BY ALL GENERATED VIEWS! (Namespace: Kreta.Core)
-- `IStudentContext` Interface: List<Grade> GetMyGrades(); User? GetMyProfile(); List<Lesson> GetMyLessons(); (Namespace: Kreta.Contexts)
-- `ITeacherContext` Interface: List<User> GetMyClassStudents(); void AddGrade(int studentId, Grade grade); List<Subject> GetAllSubjects(); List<string> GetAllClasses(); List<Lesson> GetLessons(); void AddLesson(Lesson lesson); (Namespace: Kreta.Contexts)
-- `IDirectorContext` Interface: List<User> GetAllUsers(); void CreateUser(User newUser); void DeleteUser(int userId); List<string> GetAllClasses(); void AssignClassToStudent(int studentId, string className); (Namespace: Kreta.Contexts)
+- `GenericRecord` Class: int Id, string EntityType, Role CreatedByRole, int? CreatedByUserId, DateTime CreatedAt, Dictionary<string,string> Data. (Namespace: Kreta.Core)
+- `IStudentContext` Interface: List<Grade> GetMyGrades(); User? GetMyProfile(); List<Lesson> GetMyLessons(); List<GenericRecord> QueryEntities(string entityType); GenericRecord? GetEntity(string entityType, int id); (Namespace: Kreta.Contexts)
+- `ITeacherContext` Interface: List<User> GetMyClassStudents(); void AddGrade(int studentId, Grade grade); List<Subject> GetAllSubjects(); List<string> GetAllClasses(); List<Lesson> GetLessons(); void AddLesson(Lesson lesson); List<GenericRecord> QueryEntities(string entityType); GenericRecord? GetEntity(string entityType, int id); int SaveEntity(string entityType, Dictionary<string,string> data, int? id = null); void DeleteEntity(string entityType, int id); (Namespace: Kreta.Contexts)
+- `IDirectorContext` Interface: List<User> GetAllUsers(); void CreateUser(User newUser); void DeleteUser(int userId); List<string> GetAllClasses(); void AssignClassToStudent(int studentId, string className); List<GenericRecord> QueryEntities(string entityType); GenericRecord? GetEntity(string entityType, int id); int SaveEntity(string entityType, Dictionary<string,string> data, int? id = null); void DeleteEntity(string entityType, int id); (Namespace: Kreta.Contexts)
+
+=========================================
+GENERIC ENTITY STORE — MANDATORY FOR ANY NEW CONCEPT NOT IN THE FIXED CLASSES ABOVE:
+=========================================
+This system CANNOT add a new C# domain class or a new Context method for every new feature the user might ask for (e.g. ""notice board"", ""NoticeMessage"", ""event calendar"", ""poll"", ""message wall"", etc.).
+Those hundreds of possible future concepts MUST be built entirely on top of the ALREADY EXISTING `GenericRecord` class and the `QueryEntities` / `GetEntity` / `SaveEntity` / `DeleteEntity` methods above, using an `entityType` string that YOU choose.
+1. NEVER invent a new C# class to hold the feature's data (e.g. do NOT write `public class NoticeMessage`). It does not exist anywhere else in the project and WILL NOT COMPILE.
+2. NEVER invent a new Context method (e.g. do NOT call `GetNotices()` or `AddNotice(...)`). Only the methods listed above exist on `IStudentContext` / `ITeacherContext` / `IDirectorContext`.
+3. Pick one short, consistent PascalCase `entityType` string for the feature (e.g. ""NoticeMessage"") and reuse it for every record of that feature.
+4. Store the feature's actual fields (title, body, date, target class, etc.) as string key-value pairs inside the `Data` Dictionary<string, string> of `GenericRecord`.
+5. `IStudentContext` only exposes `QueryEntities`/`GetEntity` (READ-ONLY). `SaveEntity`/`DeleteEntity` do NOT exist on it — a Student-role view can only display data, never create/edit/delete it.
+6. `ITeacherContext` and `IDirectorContext` expose full read+write (`QueryEntities`, `GetEntity`, `SaveEntity`, `DeleteEntity`) — use these to let Teacher/Director views create, edit, or remove records.
 
 =========================================
 CRITICAL C# STRING & VARIABLE SYNTAX RULES:
@@ -281,16 +296,16 @@ CRITICAL C# STRING & VARIABLE SYNTAX RULES:
 4. INTERFACE TO IMPLEMENT: You MUST implement `IEvolView` ONLY. Do NOT use non-existent interfaces like `IView`, `IAiView`, `IEvolutionView`!
 5. NO NON-EXISTENT NAMESPACES: Do NOT use `Kreta.Core.Interfaces`, `Kreta.Contexts.Interfaces`, `System.Globalization`.
 6. MANDATORY USINGS AT THE TOP OF THE C# FILE:
-   using System;
-   using System.Collections.Generic;
-   using System.Linq;
-   using Avalonia;
-   using Avalonia.Controls;
-   using Avalonia.Controls.Primitives;
-   using Avalonia.Layout;
-   using Avalonia.Media;
-   using Kreta.Core;
-   using Kreta.Contexts;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
+using Avalonia.Layout;
+using Avalonia.Media;
+using Kreta.Core;
+using Kreta.Contexts;
 7. NO DATAGRID or FuncDataTemplate. For ListBox/ComboBox, set `ItemsSource = myCollection.Select(u => $""{{u.Name}} ({{u.Role}})"").ToList()`.
 8. AVALONIA CONTROL ITEMS PROPERTY IS READ-ONLY: Use `comboBox.ItemsSource = ...` or `listBox.ItemsSource = ...`.
 9. TEXTBOX PLACEHOLDER: Use `TextBox.PlaceholderText` instead of `TextBox.Watermark`.
@@ -300,24 +315,26 @@ CRITICAL C# STRING & VARIABLE SYNTAX RULES:
 13. NULLABLE CONTROL FIELDS (CS8618): Declare private UI fields as nullable (e.g. `private ListBox? _listBox;`) or initialize them at declaration (e.g. `private ListBox _listBox = new();`) to avoid CS8618 warnings.
 14. NO REUSED CONTROL INSTANCES: Instantiate all UI Controls directly INSIDE the `CreateView()` method so every call builds a fresh UI tree without ""already has a visual parent"" errors.
 15. CONSTRUCTORS & DATA FETCHING:
-    - Always provide a context-injecting constructor `public MyView(IStudentContext context)` (or ITeacherContext / IDirectorContext).
-    - Always provide a public parameterless constructor `public MyView() {{ }}`.
+- Always provide a context-injecting constructor `public MyView(IStudentContext context)` (or ITeacherContext / IDirectorContext).
+- Always provide a public parameterless constructor `public MyView() {{ }}`.
 16. IEvolView INTERFACE MEMBERS:
-   - `public new string Name => ""A funkció magyar neve"";`
-   - `public string Description => ""Rövid magyar leírás"";`
-   - `public Control CreateView()`
+- `public new string Name => ""A funkció magyar neve"";`
+- `public string Description => ""Rövid magyar leírás"";`
+- `public Control CreateView()`
 17. KEEP C# SHORT & SIMPLE (Under 100 lines) so it easily fits within response token limits!
 
 =========================================
 SECURITY GUARDRAILS:
 =========================================
 - If a user requests a feature that violates their role permissions, return JSON with:
-  {{
+{{
     ""action"": ""REJECT"",
     ""viewName"": ""HibaView"",
     ""description"": ""Hozzáférés megtagadva""
-  }}
-{(string.IsNullOrWhiteSpace(history) ? "" : $@"
+}}
+{(string.IsNullOrWhiteSpace(history)
+    ? ""
+    : $@"
 
 =========================================
 SELF-HEALING: AZ ELŐZŐ PRÓBÁLKOZÁSOD HIBÁS VOLT!
@@ -332,7 +349,11 @@ Ez alapján generálj EGY EGYSZERŰBB, RÖVIDEBB C# kódot, ami ezt kiküszöbli
         {
             contents = new[]
             {
-                new { parts = new[] { new { text = $"Role: {role}. Normalized Spec: {spec.NormalizedIntent}. Original Prompt: {prompt}" } } }
+                new
+                {
+                    parts = new[]
+                        { new { text = $"Role: {role}. Normalized Spec: {spec.NormalizedIntent}. Original Prompt: {prompt}" } }
+                }
             },
             systemInstruction = new
             {

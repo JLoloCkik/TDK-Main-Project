@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Kreta.Core;
 
 namespace Kreta.Services.Database;
@@ -12,6 +15,14 @@ public class KretaDbContext : DbContext
     public DbSet<Grade> Grades => Set<Grade>();
     public DbSet<Lesson> Lessons => Set<Lesson>();
 
+    /// <summary>
+    /// Altalanos, tetszoleges uj funkciohoz hasznalhato entitasok tablaja.
+    /// Ide kerul MINDEN olyan uj adat, amit a Gemini a fix domain-osztalyokon (Grade, Lesson,
+    /// Subject, User) kivul, sajat maga valasztott EntityType cimkevel akar tarolni
+    /// (pl. hirdetotabla / "NoticeMessage", esemenyek, szavazasok, stb.).
+    /// </summary>
+    public DbSet<GenericRecord> GenericRecords => Set<GenericRecord>();
+
     public KretaDbContext()
     {
         // 🟢 JAVÍTÁS: Biztosítjuk, hogy az SQLite fájl és a táblák séma szerint mindig létrejöjjenek
@@ -21,6 +32,30 @@ public class KretaDbContext : DbContext
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         optionsBuilder.UseSqlite("Data Source=evol_kreta.db");
+    }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        // A GenericRecord.Data (Dictionary<string,string>) mezot egyetlen JSON string oszlopkent
+        // taroljuk az SQLite-ban, igy nincs szukseg kulon EAV-tablara uj funkciotipusonkent.
+        var dataComparer = new ValueComparer<Dictionary<string, string>>(
+            (a, b) => JsonSerializer.Serialize(a, (JsonSerializerOptions?)null) ==
+                      JsonSerializer.Serialize(b, (JsonSerializerOptions?)null),
+            d => d == null ? 0 : JsonSerializer.Serialize(d, (JsonSerializerOptions?)null).GetHashCode(),
+            d => new Dictionary<string, string>(d));
+
+        modelBuilder.Entity<GenericRecord>()
+            .Property(r => r.Data)
+            .HasConversion(
+                d => JsonSerializer.Serialize(d, (JsonSerializerOptions?)null),
+                s => JsonSerializer.Deserialize<Dictionary<string, string>>(s, (JsonSerializerOptions?)null)
+                     ?? new Dictionary<string, string>(),
+                dataComparer);
+
+        modelBuilder.Entity<GenericRecord>()
+            .HasIndex(r => r.EntityType);
     }
 
     public void SeedData()

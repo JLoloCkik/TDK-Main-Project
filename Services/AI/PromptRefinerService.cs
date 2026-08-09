@@ -37,20 +37,29 @@ ACTIVE USER ROLE: {role}
 ROLE PERMISSIONS & CONTEXT METHODS:
 1. Student (Diák):
    - Allowed Context: IStudentContext
-   - Allowed Methods: GetMyGrades(), GetMyProfile(), GetMyLessons()
-   - FORBIDDEN: Any grade insertion, teacher functions, or administration.
+   - Allowed Methods: GetMyGrades(), GetMyProfile(), GetMyLessons(), QueryEntities(), GetEntity()
+   - FORBIDDEN: Any grade insertion, teacher functions, administration, SaveEntity(), DeleteEntity().
 2. Teacher (Tanár):
    - Allowed Context: ITeacherContext
-   - Allowed Methods: GetMyClassStudents(), AddGrade(), GetAllSubjects(), GetAllClasses(), GetLessons(), AddLesson()
+   - Allowed Methods: GetMyClassStudents(), AddGrade(), GetAllSubjects(), GetAllClasses(), GetLessons(), AddLesson(), QueryEntities(), GetEntity(), SaveEntity(), DeleteEntity()
    - FORBIDDEN: Director administration (CreateUser, DeleteUser, AssignClassToStudent).
 3. Director (Igazgató):
    - Allowed Context: IDirectorContext
-   - Allowed Methods: GetAllUsers(), CreateUser(), DeleteUser(), GetAllClasses(), AssignClassToStudent()
+   - Allowed Methods: GetAllUsers(), CreateUser(), DeleteUser(), GetAllClasses(), AssignClassToStudent(), QueryEntities(), GetEntity(), SaveEntity(), DeleteEntity()
+
+GENERIC ENTITY FEATURES (e.g. notice board / ""NoticeMessage"", events, polls, message walls, or any
+other brand-new concept the user invents that is NOT Grade/Lesson/Subject/User):
+- There is NO dedicated class or method for these. They are always built on `QueryEntities`, `GetEntity`,
+  and — for Teacher/Director only — `SaveEntity`/`DeleteEntity`.
+- When normalizing such a request, set `requiredContextMethods` to the actual generic method names above
+  (e.g. [""QueryEntities"", ""SaveEntity""]) — NEVER invent a feature-specific method name like ""AddNotice"".
+- If a Student prompt requires `SaveEntity` or `DeleteEntity` (i.e. creating/editing/deleting something),
+  that is a role violation: Students may only read via `QueryEntities`/`GetEntity`.
 
 TASK:
-1. Determine if the user prompt violates their active role (e.g., Student asking to write a grade or delete users).
+1. Determine if the user prompt violates their active role (e.g., Student asking to write a grade, delete users, or create/edit/delete a generic entity).
 2. If role is violated, set `isRoleViolating: true` and explain why in `violationReason`.
-3. Normalize the intent into explicit required features, required methods, and forbidden methods.
+3. Normalize the intent into explicit required features, required methods (using ONLY the real method names listed above), and forbidden methods.
 4. Keep JSON response strictly conforming to the requested schema.";
 
         var payload = new

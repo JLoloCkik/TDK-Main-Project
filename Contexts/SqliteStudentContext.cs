@@ -43,4 +43,18 @@ public class SqliteStudentContext : IStudentContext
             .OrderBy(l => l.Date)
             .ToList();
     }
+
+    public List<GenericRecord> QueryEntities(string entityType)
+    {
+        return _dbContext.GenericRecords
+            .Where(r => r.EntityType == entityType)
+            .OrderByDescending(r => r.CreatedAt)
+            .ToList();
+    }
+
+    public GenericRecord? GetEntity(string entityType, int id)
+    {
+        return _dbContext.GenericRecords
+            .FirstOrDefault(r => r.EntityType == entityType && r.Id == id);
+    }
 }
