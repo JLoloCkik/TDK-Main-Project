@@ -27,11 +27,49 @@ public class KretaDbContext : DbContext
     {
         // 🟢 JAVÍTÁS: Biztosítjuk, hogy az SQLite fájl és a táblák séma szerint mindig létrejöjjenek
         Database.EnsureCreated();
+        EnsureGenericRecordsTableExists();
+    }
+
+    /// <summary>
+    /// Tesztelhetőségi konstruktor: lehetővé teszi, hogy tesztek saját (pl. ideiglenes fájl vagy
+    /// in-memory) SQLite kapcsolatot injektáljanak ahelyett, hogy a valódi evol_kreta.db-t használnák.
+    /// </summary>
+    public KretaDbContext(DbContextOptions<KretaDbContext> options) : base(options)
+    {
+        Database.EnsureCreated();
+        EnsureGenericRecordsTableExists();
     }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
-        optionsBuilder.UseSqlite("Data Source=evol_kreta.db");
+        if (!optionsBuilder.IsConfigured)
+        {
+            optionsBuilder.UseSqlite("Data Source=evol_kreta.db");
+        }
+    }
+
+    /// <summary>
+    /// A Database.EnsureCreated() CSAK akkor hozza letre a teljes semat, ha az adatbazis-fajl
+    /// MEG NEM LETEZETT. Mivel a GenericRecords tabla bevezetese elott mar sok evol_kreta.db
+    /// fajl letezett (User/Grade/Lesson/Subject tablakkal), azokba EnsureCreated() utolag NEM
+    /// szurja be az uj tablat. Ez a metodus IF NOT EXISTS-szel, fajltol fuggetlenul biztositja,
+    /// hogy a GenericRecords tabla mindig letezzen - regi es uj adatbazis-fajlon egyarant,
+    /// adatvesztes (evol_kreta.db torlese) nelkul.
+    /// </summary>
+    private void EnsureGenericRecordsTableExists()
+    {
+        Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS ""GenericRecords"" (
+                ""Id"" INTEGER NOT NULL CONSTRAINT ""PK_GenericRecords"" PRIMARY KEY AUTOINCREMENT,
+                ""EntityType"" TEXT NOT NULL,
+                ""CreatedByRole"" INTEGER NOT NULL,
+                ""CreatedByUserId"" INTEGER NULL,
+                ""CreatedAt"" TEXT NOT NULL,
+                ""Data"" TEXT NOT NULL
+            );");
+
+        Database.ExecuteSqlRaw(@"
+            CREATE INDEX IF NOT EXISTS ""IX_GenericRecords_EntityType"" ON ""GenericRecords"" (""EntityType"");");
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

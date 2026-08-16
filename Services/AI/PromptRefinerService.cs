@@ -75,6 +75,9 @@ TASK:
             generationConfig = new
             {
                 responseMimeType = "application/json",
+                // A specifikáció rövid, strukturált JSON - nincs szükség "gondolkodásra" (thinking),
+                // ez gyorsabbá és token-hatékonyabbá teszi a hívást, és csökkenti a MAX_TOKENS kockázatát.
+                thinkingConfig = new { thinkingBudget = 0 },
                 responseSchema = new
                 {
                     type = "OBJECT",
@@ -109,10 +112,22 @@ TASK:
             var responseString = await response.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(responseString);
             var candidate = doc.RootElement.GetProperty("candidates")[0];
-            var responseText = candidate.GetProperty("content").GetProperty("parts")[0].GetProperty("text").GetString();
+
+            string? responseText = null;
+            if (candidate.TryGetProperty("content", out var contentEl) &&
+                contentEl.TryGetProperty("parts", out var partsEl) &&
+                partsEl.ValueKind == JsonValueKind.Array &&
+                partsEl.GetArrayLength() > 0 &&
+                partsEl[0].TryGetProperty("text", out var textEl))
+            {
+                responseText = textEl.GetString();
+            }
 
             if (string.IsNullOrWhiteSpace(responseText))
-                return CreateAndLogFallbackSpec(rawPrompt, role, "Üres válasz az AI-tól");
+            {
+                string? finishReason = candidate.TryGetProperty("finishReason", out var fr) ? fr.GetString() : null;
+                return CreateAndLogFallbackSpec(rawPrompt, role, $"Üres válasz az AI-tól (finishReason: {finishReason ?? "ismeretlen"})");
+            }
 
             var spec = JsonSerializer.Deserialize<FormalPromptSpecification>(responseText, new JsonSerializerOptions
             {

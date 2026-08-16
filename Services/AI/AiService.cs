@@ -65,7 +65,8 @@ public class AiService : IAiService
         return response.SourceCode ?? string.Empty;
     }
 
-    public async Task<AiEvolveResponse> GenerateFeatureAsync(string prompt, Role role, string? history = null)
+    public async Task<AiEvolveResponse> GenerateFeatureAsync(string prompt, Role role, string? history = null,
+        string? targetViewFilePath = null)
     {
         var apiKey = GetApiKey();
         if (string.IsNullOrWhiteSpace(apiKey))
@@ -136,7 +137,7 @@ public class AiService : IAiService
                     }
 
                     var response = await CallGeminiApiInternalAsync(prompt, role, formalSpec, history, apiKey,
-                        (string)attempt.Version, (string)attempt.Model);
+                        (string)attempt.Version, (string)attempt.Model, targetViewFilePath);
 
                     _preferredVersion = attempt.Version;
                     _preferredModel = attempt.Model;
@@ -225,18 +226,65 @@ public class AiService : IAiService
         }
     }
 
+    /// <summary>
+    /// Ha a felhasználó a felületen KIJELÖLT egy már létező, korábban generált nézetet (pl. rákattintott
+    /// az oldalsávban a ""Jegy Kalkulátor""-ra), és utána kér módosítást, ezt a metódust hívjuk meg,
+    /// hogy a TELJES (nem csonkolt) forráskódját beemeljük a system promptba, egyértelmű MODIFY
+    /// utasítással. Ez kiváltja azt a korábbi, megbízhatatlan viselkedést, hogy a modellnek a
+    /// GetExistingViewsContext() által felsorolt, csonkolt kódú nézetek közül kellett volna KITALÁLNIA
+    /// (név alapján, szabad szövegből), melyiket akarja a felhasználó módosítani.
+    /// </summary>
+    private string GetTargetViewContext(string? targetViewFilePath)
+    {
+        if (string.IsNullOrWhiteSpace(targetViewFilePath) || !File.Exists(targetViewFilePath))
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            var fileName = Path.GetFileName(targetViewFilePath);
+            var className = Path.GetFileNameWithoutExtension(targetViewFilePath);
+            var fullSource = File.ReadAllText(targetViewFilePath);
+
+            return $@"
+=========================================
+A FELHASZNÁLÓ ÁLTAL JELENLEG KIJELÖLT / MEGNYITOTT NÉZET — EZT MÓDOSÍTSD KÖZVETLENÜL, NE TALÁLJ KI ÚJAT!
+=========================================
+A felhasználó ÉPPEN EZT a nézetet nyitotta meg/jelölte ki az oldalsávban ({fileName}), amikor elküldte a kérést.
+Ha a kérés ennek a nézetnek a javítására, módosítására, bővítésére vagy hibaelhárítására vonatkozik
+(pl. ""javítsd ki, mert nem működik"", ""adj hozzá egy törlés gombot"", ""ezt nem tudom kimenteni""), akkor:
+1. NE hozz létre egy új, más nevű osztályt - MINDIG KÖZVETLENÜL EZT MÓDOSÍTSD.
+2. Az `action` mező LEGYEN ""MODIFY"", a `viewName` mező PONTOSAN ez legyen: ""{className}"".
+3. A `sourceCode` mezőben a TELJES, JAVÍTOTT forráskódot add vissza - az alábbi TELJES (nem csonkolt),
+   jelenleg futó forráskódból indulj ki, és CSAK azt változtasd meg, amit a kérés ténylegesen igényel.
+   Ne írd át feleslegesen a jól működő részeket, és ne veszítsd el a meglévő funkciókat.
+
+--- TELJES JELENLEGI FORRÁSKÓD ({fileName}) ---
+{fullSource}
+--- FORRÁSKÓD VÉGE ---
+";
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
     private async Task<AiEvolveResponse> CallGeminiApiInternalAsync(string prompt, Role role,
-        FormalPromptSpecification spec, string? history, string apiKey, string apiVersion, string modelName)
+        FormalPromptSpecification spec, string? history, string apiKey, string apiVersion, string modelName,
+        string? targetViewFilePath = null)
     {
         var url = $"https://generativelanguage.googleapis.com/{apiVersion}/models/{modelName}:generateContent?key={apiKey}";
 
         var existingViewsContext = GetExistingViewsContext();
+        var targetViewContext = GetTargetViewContext(targetViewFilePath);
 
         var systemInstruction = $@"You are the automated C# and Avalonia UI compiler-agent for ""EvolKréta"", a self-evolving educational system.
 Your objective is to generate, MODIFY, or DELETE safe, compile-safe, and strictly role-appropriate C# code for dynamic views.
 
 ACTIVE USER ROLE: {role}
-
+{targetViewContext}
 =========================================
 FORMAL SPECIFICATION CONTRACT (MUST BE STRICTLY FOLLOWED):
 =========================================
@@ -254,7 +302,8 @@ SPECIFICATION CONFORMANCE RULES:
 {existingViewsContext}
 
 INSTRUCTIONS FOR MODIFYING OR DELETING EXISTING VIEWS:
-- If the prompt asks to EDIT/MODIFY an existing view (e.g., ""Módosítsd a Sportnap nézetet""), output the UPDATED full C# source code keeping the SAME class name base and structure.
+- If a ""KIJELÖLT / MEGNYITOTT NÉZET"" block is present above, that is your primary source of truth for MODIFY requests - use IT, not a guess from the list below.
+- Otherwise, if the prompt asks to EDIT/MODIFY an existing view by name (e.g., ""Módosítsd a Sportnap nézetet""), output the UPDATED full C# source code keeping the SAME class name base and structure.
 - If the prompt asks to DELETE/REMOVE an existing view (e.g., ""Töröld a Sportnap nézetet""), return JSON with:
   {{
     ""action"": ""DELETE"",
@@ -294,7 +343,7 @@ CRITICAL C# STRING & VARIABLE SYNTAX RULES:
 2. SINGLE-LINE STRINGS ONLY: Every UI text string literal must be strictly on a single line (e.g., ""Varhato atlag: "" + atlag.ToString(""F2"")). Never split string literals across multiple lines without '+' concatenation.
 3. EXPLICIT RETURN STATEMENT: The `CreateView()` method MUST end with an explicit return statement (e.g. `return mainStackPanel;` or `return mainBorder;`) on ALL code paths!
 4. INTERFACE TO IMPLEMENT: You MUST implement `IEvolView` ONLY. Do NOT use non-existent interfaces like `IView`, `IAiView`, `IEvolutionView`!
-5. NO NON-EXISTENT NAMESPACES: Do NOT use `Kreta.Core.Interfaces`, `Kreta.Contexts.Interfaces`, `System.Globalization`.
+5. NO NON-EXISTENT NAMESPACES: Do NOT use `Kreta.Core.Interfaces`, `Kreta.Contexts.Interfaces`. `System.Globalization` (e.g. `CultureInfo.InvariantCulture`) IS allowed and recommended for locale-safe number/date formatting.
 6. MANDATORY USINGS AT THE TOP OF THE C# FILE:
 using System;
 using System.Collections.Generic;
@@ -306,6 +355,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Kreta.Core;
 using Kreta.Contexts;
+(Add `using System.Globalization;` too if you use CultureInfo/number formatting.)
 7. NO DATAGRID or FuncDataTemplate. For ListBox/ComboBox, set `ItemsSource = myCollection.Select(u => $""{{u.Name}} ({{u.Role}})"").ToList()`.
 8. AVALONIA CONTROL ITEMS PROPERTY IS READ-ONLY: Use `comboBox.ItemsSource = ...` or `listBox.ItemsSource = ...`.
 9. TEXTBOX PLACEHOLDER: Use `TextBox.PlaceholderText` instead of `TextBox.Watermark`.
@@ -362,7 +412,10 @@ Ez alapján generálj EGY EGYSZERŰBB, RÖVIDEBB C# kódot, ami ezt kiküszöbli
             generationConfig = new
             {
                 responseMimeType = "application/json",
-                maxOutputTokens = 8192,
+                // 🟢 JAVÍTÁS: 8192 túl kevés volt - a gemini-2.5-pro "gondolkodási" (thinking) tokenjei
+                // önmagukban felemésztették a teljes kvótát, ezért a válasz csonkán (MAX_TOKENS) szakadt meg,
+                // mielőtt a tényleges JSON/C# kód elkezdődött volna. Nagyobb kerettel ez elkerülhető.
+                maxOutputTokens = 32768,
                 responseSchema = new
                 {
                     type = "OBJECT",
@@ -409,17 +462,29 @@ Ez alapján generálj EGY EGYSZERŰBB, RÖVIDEBB C# kódot, ami ezt kiküszöbli
 
             string? finishReason = candidate.TryGetProperty("finishReason", out var fr) ? fr.GetString() : null;
 
-            var partsElement = candidate.GetProperty("content").GetProperty("parts");
-            var responseText = partsElement.GetArrayLength() > 0
-                ? partsElement[0].GetProperty("text").GetString()
-                : null;
+            // 🟢 JAVÍTÁS: A "content" objektumnak MAX_TOKENS esetén (amikor a válasz a "gondolkodási"
+            // fázisban szakad meg) egyáltalán nincs "parts" mezője - a korábbi kód ezen a ponton egy
+            // kevéssé informatív, nyers KeyNotFoundException-t dobott. TryGetProperty-vel biztonságosan
+            // kezeljük, és egyenesen az alábbi, egyértelmű MAX_TOKENS hibaágba futunk.
+            string? responseText = null;
+            if (candidate.TryGetProperty("content", out var contentEl) &&
+                contentEl.TryGetProperty("parts", out var partsElement) &&
+                partsElement.ValueKind == JsonValueKind.Array &&
+                partsElement.GetArrayLength() > 0 &&
+                partsElement[0].TryGetProperty("text", out var textEl))
+            {
+                responseText = textEl.GetString();
+            }
 
             if (string.IsNullOrEmpty(responseText))
             {
                 if (finishReason == "MAX_TOKENS")
                 {
+                    // A "MAX_TOKENS" szót SZÁNDÉKOSAN tartalmazza az üzenet: a hívó GenerateFeatureAsync
+                    // újrapróbálkozási logikája erre a pontos szövegre keres, hogy tudja, érdemes-e
+                    // (rövidebb kódot kérve) újra próbálkozni ahelyett, hogy azonnal feladná.
                     throw new Exception(
-                        "A modell válasza megszakadt, mielőtt befejezte volna a kódot (token-limit). " +
+                        "A modell válasza megszakadt, mielőtt befejezte volna a kódot (finishReason: MAX_TOKENS). " +
                         "Kérj egy egyszerűbb / kisebb funkciót, vagy próbáld újra.");
                 }
 

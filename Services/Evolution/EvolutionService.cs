@@ -35,9 +35,11 @@ public class EvolutionService : IEvolutionService
         _gitService = gitService;
     }
 
-    public async Task<EvolveResult> EvolveAsync(string prompt, Role currentRole, int maxAttempts = 3)
+    public async Task<EvolveResult> EvolveAsync(string prompt, Role currentRole, int maxAttempts = 3,
+        string? targetViewFilePath = null)
     {
-        Console.WriteLine($"[Evolúció] Új kérés feldolgozása: '{prompt}' ({currentRole})...");
+        Console.WriteLine($"[Evolúció] Új kérés feldolgozása: '{prompt}' ({currentRole})" +
+            (string.IsNullOrWhiteSpace(targetViewFilePath) ? "..." : $" [Kijelölt nézet: {Path.GetFileName(targetViewFilePath)}]..."));
 
         string? history = null;
 
@@ -48,7 +50,7 @@ public class EvolutionService : IEvolutionService
                 Console.WriteLine($"[Evolúció - Self-Healing] Újrapróbálkozás ({attempt}/{maxAttempts}) az előző fordítási hiba kijavításával...");
             }
 
-            var aiResponse = await _aiService.GenerateFeatureAsync(prompt, currentRole, history);
+            var aiResponse = await _aiService.GenerateFeatureAsync(prompt, currentRole, history, targetViewFilePath);
 
             // 1. RBAC Guardrail elutasítás: Nem mentjük lelemezként!
             if (aiResponse.Action == "REJECT")

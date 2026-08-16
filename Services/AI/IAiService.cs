@@ -16,5 +16,11 @@ public interface IAiService
     /// <summary>
     /// Szerepkör-alapú és előzmény-tudatos funkciógenerálás, módosítás vagy törlés.
     /// </summary>
-    Task<AiEvolveResponse> GenerateFeatureAsync(string prompt, Role role, string? history = null);
+    /// <param name="targetViewFilePath">
+    /// Opcionális: annak a jelenleg kijelölt/megnyitott nézetnek a fájlútja, amelyet a felhasználó
+    /// a felületen épp néz. Ha meg van adva, az AI ennek a TELJES, meglévő forráskódját kapja meg
+    /// és azt módosítja közvetlenül, ahelyett hogy a nézet-lista alapján kellene kitalálnia.
+    /// </param>
+    Task<AiEvolveResponse> GenerateFeatureAsync(string prompt, Role role, string? history = null,
+        string? targetViewFilePath = null);
 }

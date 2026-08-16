@@ -16,6 +16,7 @@ public class AstAnalyzer
         "System.Collections.Generic",
         "System.Linq",
         "System.Text",
+        "System.Globalization",
         "Avalonia",
         "Avalonia.Controls",
         "Avalonia.Controls.Primitives",

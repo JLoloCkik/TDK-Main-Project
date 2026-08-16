@@ -26,6 +26,14 @@ public partial class MainWindow : Window
     private EvolveResult? _lastEvolveResult;
     private Role _currentRole = Role.Student;
 
+    /// <summary>
+    /// A felhasználó által az oldalsávban éppen kijelölt/megnyitott nézet, és annak fájlútja.
+    /// Amíg be van állítva, a következő AI-kérés KÖZVETLENÜL ezt a nézetet módosítja/javítja
+    /// ahelyett, hogy a rendszernek ki kellene találnia a szabad szövegből, melyikről van szó.
+    /// </summary>
+    private IEvolView? _selectedView;
+    private string? _selectedViewFilePath;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -41,6 +49,7 @@ public partial class MainWindow : Window
         AiButton.Click += OnAiButtonClick;
         ApproveButton.Click += OnApproveButtonClick;
         DiscardButton.Click += OnDiscardButtonClick;
+        ClearSelectionButton.Click += OnClearSelectionClick;
 
         BootAndCompileSavedModules();
     }
@@ -228,6 +237,11 @@ public partial class MainWindow : Window
                 var freshInstance = InstantiateViewForRole(view.GetType()) ?? view;
                 MainContentArea.Content = freshInstance.CreateView();
 
+                // A frissen példányosított nézetet jelöljük ki, és a hozzá tartozó fájlútvonalat
+                // rögzítjük - innentől a következő AI-kérés KÖZVETLENÜL ezt a nézetet fogja módosítani.
+                _viewFilePathMap.TryGetValue(view, out var filePath);
+                SelectView(freshInstance, filePath, view.Name);
+
                 StatusText.Text = $"Nézet betöltve: {view.Name}";
                 StatusText.Foreground = Brushes.LightGreen;
             }
@@ -240,12 +254,52 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// Kijelöl egy nézetet: eltárolja a fájlútját, és megjeleníti a kijelölés-sávot, hogy a felhasználó
+    /// lássa, a következő AI-kérés közvetlenül ezt fogja módosítani.
+    /// </summary>
+    private void SelectView(IEvolView view, string? filePath, string displayName)
+    {
+        _selectedView = view;
+        _selectedViewFilePath = filePath;
+
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            // Nincs ismert fájlútvonal (pl. beépített, nem AI-generált nézet) - nem tudjuk közvetlenül
+            // szerkeszteni, ezért nem jelenítjük meg kijelöltként.
+            SelectedViewBanner.IsVisible = false;
+            return;
+        }
+
+        SelectedViewBanner.IsVisible = true;
+        SelectedViewText.Text = $"Kijelölve: „{displayName}” — a következő kérésed közvetlenül EZT a nézetet fogja módosítani/javítani.";
+    }
+
+    /// <summary>
+    /// Törli a kijelölést: a következő AI-kérés újra vadonatúj funkcióként lesz kezelve.
+    /// </summary>
+    private void ClearSelection()
+    {
+        _selectedView = null;
+        _selectedViewFilePath = null;
+        SelectedViewBanner.IsVisible = false;
+    }
+
+    private void OnClearSelectionClick(object? sender, RoutedEventArgs e)
+    {
+        ClearSelection();
+        StatusText.Text = "Kijelölés törölve. A következő kérés új funkciót fog létrehozni.";
+        StatusText.Foreground = Brushes.LightBlue;
+    }
+
     private void OnRoleSelectorChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (RoleSelector.SelectedItem is ComboBoxItem selectedItem &&
             Enum.TryParse<Role>(selectedItem.Tag?.ToString(), out var role))
         {
             _currentRole = role;
+            ClearSelection();
+            MainContentArea.Content = null;
             RefreshSidebarMenu();
             StatusText.Text = $"Szerepkör átváltva: {selectedItem.Content}";
             StatusText.Foreground = Brushes.LightBlue;
@@ -263,12 +317,14 @@ public partial class MainWindow : Window
         }
 
         SetBusy(true);
-        StatusText.Text = "AI kódgenerálás folyamatban...";
+        StatusText.Text = string.IsNullOrWhiteSpace(_selectedViewFilePath)
+            ? "AI kódgenerálás folyamatban..."
+            : $"AI módosítás folyamatban a kijelölt nézeten ({_selectedView?.Name})...";
         StatusText.Foreground = Brushes.Cyan;
 
         try
         {
-            var result = await _evolutionService.EvolveAsync(prompt, _currentRole);
+            var result = await _evolutionService.EvolveAsync(prompt, _currentRole, targetViewFilePath: _selectedViewFilePath);
             _lastEvolveResult = result;
 
             if (result.IsRejectedAction)
@@ -289,6 +345,9 @@ public partial class MainWindow : Window
 
                 _loadedViews.RemoveAll(v => v.Name.Contains(result.ViewName ?? "", StringComparison.OrdinalIgnoreCase));
                 RefreshSidebarMenu();
+
+                // Ha a törölt nézet volt kijelölve, a kijelölés már érvénytelen - töröljük.
+                ClearSelection();
 
                 ApproveButton.IsVisible = false;
                 DiscardButton.IsVisible = false;
@@ -315,6 +374,11 @@ public partial class MainWindow : Window
                             _loadedViews.Add(instance);
                             _viewFilePathMap[instance] = result.FilePath;
                             RefreshSidebarMenu();
+
+                            // A kijelölést a FRISSEN generált/módosított nézetre frissítjük, hogy a
+                            // következő prompt (pl. "javítsd ki még ezt is") ugyanazt a fájlt módosítsa
+                            // tovább - így iteratívan lehet finomítani/repair-elni egy funkciót.
+                            SelectView(instance, result.FilePath, result.ViewName ?? instance.Name);
                         }
                     }
                 }
@@ -392,6 +456,12 @@ public partial class MainWindow : Window
             StatusText.Text = "Funkció elvetve és törölve a lemezről.";
             StatusText.Foreground = Brushes.Yellow;
             MainContentArea.Content = null;
+
+            // Ha az elvetett fájl volt a kijelölt nézet, a kijelölés már érvénytelen - töröljük.
+            if (string.Equals(_selectedViewFilePath, _lastEvolveResult.FilePath, StringComparison.OrdinalIgnoreCase))
+            {
+                ClearSelection();
+            }
 
             if (_lastEvolveResult.CompiledAssembly != null)
             {
