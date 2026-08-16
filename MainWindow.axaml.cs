@@ -8,8 +8,11 @@ using Avalonia.Media;
 using Kreta.Contexts;
 using Kreta.Core;
 using Kreta.Services;
+using Kreta.Services.AI;
 using Kreta.Services.Database;
 using Kreta.Services.Evolution;
+using Kreta.Services.Security;
+using Kreta.Services.Testing;
 
 namespace Kreta;
 
@@ -479,6 +482,26 @@ public partial class MainWindow : Window
         ApproveButton.IsVisible = false;
         DiscardButton.IsVisible = false;
     }
+    private async void RunAutomatedBenchmark()
+    {
+        var runner = new AutomatedTestRunner(_evolutionService, new AstAnalyzer(), new PromptConformanceVerifier());
+
+        // 1. Lefuttatja az 100 tesztet
+        var results = await runner.RunAllTestsAsync(
+            delayBetweenTestsMs: 1000, 
+            progressCallback: (current, total, result) => {
+                Console.WriteLine($"[Haladás: {current}/{total}] {result.Prompt} -> {(result.IsSuccess ? "OK" : "HIBA")}");
+            }
+        );
+
+        // 2. Legenerálja a frissített Markdown riportot
+        string markdownReport = runner.ExportToMarkdownReport(results);
+
+        // 3. Elmenti a lemezre közvetlenül a Canvas-ban lévő Markdown fájl helyére
+        File.WriteAllText("teszt_adatkeszlet_100.md", markdownReport);
+        Console.WriteLine("🟢 A mérési adatok frissítve a 'teszt_adatkeszlet_100.md' fájlban!");
+    }
+    
 
     private void SetBusy(bool isBusy)
     {
