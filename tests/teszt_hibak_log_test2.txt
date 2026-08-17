@@ -1,0 +1,57 @@
+[2026-08-16 17:19:26] [TESZT #1] [TIMEOUT]
+[TIMEOUT HIBA] A teszt túllépte a(z) 35 másodperces korlátot!
+----------------------------------------
+[2026-08-16 17:20:03] [TESZT #2] [TIMEOUT]
+[TIMEOUT HIBA] A teszt túllépte a(z) 35 másodperces korlátot!
+----------------------------------------
+[2026-08-16 17:22:04] [TESZT #7] [TIMEOUT]
+[TIMEOUT HIBA] A teszt túllépte a(z) 35 másodperces korlátot!
+----------------------------------------
+[2026-08-16 17:22:41] [TESZT #8] [TIMEOUT]
+[TIMEOUT HIBA] A teszt túllépte a(z) 35 másodperces korlátot!
+----------------------------------------
+[2026-08-16 17:24:08] [TESZT #31] [TIMEOUT]
+[TIMEOUT HIBA] A teszt túllépte a(z) 35 másodperces korlátot!
+----------------------------------------
+[2026-08-16 17:24:45] [TESZT #32] [TIMEOUT]
+[TIMEOUT HIBA] A teszt túllépte a(z) 35 másodperces korlátot!
+----------------------------------------
+[2026-08-16 17:25:21] [TESZT #14] [TIMEOUT]
+[TIMEOUT HIBA] A teszt túllépte a(z) 35 másodperces korlátot!
+----------------------------------------
+[2026-08-16 17:25:58] [TESZT #15] [TIMEOUT]
+[TIMEOUT HIBA] A teszt túllépte a(z) 35 másodperces korlátot!
+----------------------------------------
+[2026-08-16 17:26:34] [TESZT #16] [TIMEOUT]
+[TIMEOUT HIBA] A teszt túllépte a(z) 35 másodperces korlátot!
+----------------------------------------
+[2026-08-16 17:27:11] [TESZT #18] [TIMEOUT]
+[TIMEOUT HIBA] A teszt túllépte a(z) 35 másodperces korlátot!
+----------------------------------------
+[2026-08-16 17:27:47] [TESZT #20] [TIMEOUT]
+[TIMEOUT HIBA] A teszt túllépte a(z) 35 másodperces korlátot!
+----------------------------------------
+[2026-08-16 17:29:19] [TESZT #25] [TIMEOUT]
+[TIMEOUT HIBA] A teszt túllépte a(z) 35 másodperces korlátot!
+----------------------------------------
+[2026-08-16 17:30:20] [TESZT #40] [TIMEOUT]
+[TIMEOUT HIBA] A teszt túllépte a(z) 35 másodperces korlátot!
+----------------------------------------
+[2026-08-16 17:30:56] [TESZT #44] [TIMEOUT]
+[TIMEOUT HIBA] A teszt túllépte a(z) 35 másodperces korlátot!
+----------------------------------------
+[2026-08-16 17:31:33] [TESZT #46] [TIMEOUT]
+[TIMEOUT HIBA] A teszt túllépte a(z) 35 másodperces korlátot!
+----------------------------------------
+[2026-08-16 17:32:10] [TESZT #47] [TIMEOUT]
+[TIMEOUT HIBA] A teszt túllépte a(z) 35 másodperces korlátot!
+----------------------------------------
+[2026-08-16 17:32:49] [TESZT #52] [TIMEOUT]
+[TIMEOUT HIBA] A teszt túllépte a(z) 35 másodperces korlátot!
+----------------------------------------
+[2026-08-16 17:34:05] [TESZT #57] [TIMEOUT]
+[TIMEOUT HIBA] A teszt túllépte a(z) 35 másodperces korlátot!
+----------------------------------------
+[2026-08-16 17:34:44] [TESZT #59] [TIMEOUT]
+[TIMEOUT HIBA] A teszt túllépte a(z) 35 másodperces korlátot!
+----------------------------------------

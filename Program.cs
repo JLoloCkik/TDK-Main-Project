@@ -34,7 +34,7 @@ class Program
                 await runner.RunAllTestsAsync(
                     resumeFromCheckpoint: true,
                     delayBetweenTestsMs: 1500,
-                    perTestTimeoutMs: 35000,
+                    perTestTimeoutMs: 60000,
                     progressCallback: (current, total, result) =>
                     {
                         string status = result.IsSuccess ? "🟢 OK" : "🔴 HIBA";
