@@ -6,11 +6,12 @@ using System.Reflection;
 using System.Runtime.Loader;
 using Avalonia.Controls;
 using Avalonia.Layout;
+using Avalonia.Media;
+using Kreta.Contexts;
+using Kreta.Core;
+using Kreta.Services.Database;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Kreta.Core;
-using Kreta.Contexts;
-using Kreta.Services.Database;
 
 namespace Kreta.Services.Evolution;
 
@@ -31,7 +32,7 @@ public class DynamicLoader : IDynamicLoader
                 typeof(UserControl).Assembly,
                 typeof(Control).Assembly,
                 typeof(HorizontalAlignment).Assembly,
-                typeof(Avalonia.Media.Brushes).Assembly,
+                typeof(Brushes).Assembly,
                 typeof(IEvolView).Assembly,
                 typeof(IStudentContext).Assembly,
                 typeof(ITeacherContext).Assembly,
@@ -40,12 +41,8 @@ public class DynamicLoader : IDynamicLoader
             };
 
             foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
-            {
                 if (!asm.IsDynamic && !string.IsNullOrWhiteSpace(asm.Location))
-                {
                     assembliesToRef.Add(asm);
-                }
-            }
 
             var references = assembliesToRef
                 .Where(a => !a.IsDynamic && !string.IsNullOrWhiteSpace(a.Location) && File.Exists(a.Location))
@@ -76,19 +73,18 @@ public class DynamicLoader : IDynamicLoader
             }
 
             ms.Seek(0, SeekOrigin.Begin);
-            var alc = new AssemblyLoadContext(assemblyName, isCollectible: true);
+            var alc = new AssemblyLoadContext(assemblyName, true);
             var assembly = alc.LoadFromStream(ms);
 
-            var type = assembly.GetTypes().FirstOrDefault(t => typeof(IEvolView).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract);
+            var type = assembly.GetTypes()
+                .FirstOrDefault(t => typeof(IEvolView).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract);
 
             if (type == null)
-            {
                 return new DynamicLoadResult
                 {
                     IsSuccess = false,
                     ErrorMessage = "Nem található IEvolView megvalósítás a generált kódban."
                 };
-            }
 
             object? instance = null;
 
@@ -106,26 +102,18 @@ public class DynamicLoader : IDynamicLoader
                     var parameters = ctor.GetParameters();
                     var args = new object?[parameters.Length];
 
-                    for (int i = 0; i < parameters.Length; i++)
+                    for (var i = 0; i < parameters.Length; i++)
                     {
                         var paramType = parameters[i].ParameterType;
 
                         if (paramType == typeof(IStudentContext))
-                        {
                             args[i] = new SqliteStudentContext(new KretaDbContext(), 1);
-                        }
                         else if (paramType == typeof(ITeacherContext))
-                        {
                             args[i] = new SqliteTeacherContext(new KretaDbContext());
-                        }
                         else if (paramType == typeof(IDirectorContext))
-                        {
                             args[i] = new SqliteDirectorContext(new KretaDbContext());
-                        }
                         else
-                        {
                             args[i] = paramType.IsValueType ? Activator.CreateInstance(paramType) : null;
-                        }
                     }
 
                     instance = ctor.Invoke(args);
@@ -133,13 +121,11 @@ public class DynamicLoader : IDynamicLoader
             }
 
             if (instance == null)
-            {
                 return new DynamicLoadResult
                 {
                     IsSuccess = false,
                     ErrorMessage = "Nem sikerült példányosítani a generált osztályt."
                 };
-            }
 
             var evolView = instance as IEvolView;
             var control = evolView?.CreateView();

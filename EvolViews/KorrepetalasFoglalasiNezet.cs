@@ -1,0 +1,184 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Interactivity;
+using Avalonia.Layout;
+using Avalonia.Media;
+using Kreta.Contexts;
+using Kreta.Core;
+
+public class KorrepetalasFoglalasiNezet : IEvolView
+{
+    private const string EntityType = "TutoringReservation";
+    private readonly ITeacherContext? _context;
+    private DatePicker? _datePicker;
+    private StackPanel? _editPanel;
+    private NumericUpDown? _maxCapacityNumericUpDown;
+    private Button? _newButton;
+    private ListBox? _reservationListBox;
+    private List<GenericRecord>? _reservations;
+    private Button? _saveButton;
+    private GenericRecord? _selectedReservation;
+    private TextBlock? _statusTextBlock;
+    private ComboBox? _subjectComboBox;
+    private List<Subject>? _subjects;
+    private TextBox? _timeTextBox;
+
+    public KorrepetalasFoglalasiNezet()
+    {
+    }
+
+    public KorrepetalasFoglalasiNezet(ITeacherContext context)
+    {
+        _context = context;
+    }
+
+    public new string Name => "Korrepetálás Foglaló";
+
+    public string Description =>
+        "Tanár által tartott korrepetálási időpontok létrehozása és kezelése, maximális létszám megadásával.";
+
+    public Control CreateView()
+    {
+        var mainPanel = new DockPanel();
+        _reservationListBox = new ListBox { Width = 300, Margin = new Thickness(10) };
+        _reservationListBox.SelectionChanged += OnReservationSelected;
+        DockPanel.SetDock(_reservationListBox, Dock.Left);
+        _editPanel = new StackPanel
+            { Orientation = Orientation.Vertical, Spacing = 10, Margin = new Thickness(10), IsEnabled = false };
+        _newButton = new Button { Content = "Új időpont meghirdetése" };
+        _newButton.Click += OnNewClicked;
+        _editPanel.Children.Add(new TextBlock { Text = "Tantárgy:" });
+        _subjectComboBox = new ComboBox { Width = 200 };
+        _editPanel.Children.Add(_subjectComboBox);
+        _editPanel.Children.Add(new TextBlock { Text = "Dátum:" });
+        _datePicker = new DatePicker { Width = 200 };
+        _editPanel.Children.Add(_datePicker);
+        _editPanel.Children.Add(new TextBlock { Text = "Időpont (HH:mm):" });
+        _timeTextBox = new TextBox { Width = 200 };
+        _editPanel.Children.Add(_timeTextBox);
+        _editPanel.Children.Add(new TextBlock { Text = "Maximális létszám:" });
+        _maxCapacityNumericUpDown = new NumericUpDown { Minimum = 1, Maximum = 30, Value = 5, Width = 200 };
+        _editPanel.Children.Add(_maxCapacityNumericUpDown);
+        _saveButton = new Button { Content = "Mentés" };
+        _saveButton.Click += OnSaveClicked;
+        _statusTextBlock = new TextBlock { Margin = new Thickness(0, 10, 0, 0) };
+        var buttonPanel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
+        buttonPanel.Children.Add(_saveButton);
+        buttonPanel.Children.Add(_newButton);
+        _editPanel.Children.Add(buttonPanel);
+        _editPanel.Children.Add(_statusTextBlock);
+        mainPanel.Children.Add(_reservationListBox);
+        mainPanel.Children.Add(_editPanel);
+        LoadReservations();
+        LoadSubjects();
+        return mainPanel;
+    }
+
+    private void LoadReservations()
+    {
+        if (_context == null || _reservationListBox == null) return;
+        _reservations = _context.QueryEntities(EntityType);
+        _reservationListBox.ItemsSource = _reservations.Select(r =>
+        {
+            var subject = r.Data.GetValueOrDefault("Subject", "Ismeretlen");
+            var date = r.Data.GetValueOrDefault("Date", "Ismeretlen");
+            return $"{subject} - {date}";
+        }).ToList();
+    }
+
+    private void LoadSubjects()
+    {
+        if (_context == null || _subjectComboBox == null) return;
+        _subjects = _context.GetAllSubjects();
+        _subjectComboBox.ItemsSource = _subjects.Select(s => s.Name).ToList();
+    }
+
+    private void OnNewClicked(object? sender, RoutedEventArgs e)
+    {
+        if (_editPanel == null || _reservationListBox == null || _statusTextBlock == null) return;
+        _selectedReservation = null;
+        _reservationListBox.SelectedItem = null;
+        _editPanel.IsEnabled = true;
+        if (_subjectComboBox != null) _subjectComboBox.SelectedIndex = -1;
+        if (_datePicker != null) _datePicker.SelectedDate = DateTime.Today;
+        if (_timeTextBox != null) _timeTextBox.Text = "15:00";
+        if (_maxCapacityNumericUpDown != null) _maxCapacityNumericUpDown.Value = 5;
+        _statusTextBlock.Text = "Új korrepetálási időpont adatainak megadása.";
+    }
+
+    private void OnReservationSelected(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_reservationListBox == null || _editPanel == null) return;
+        if (_reservationListBox.SelectedItem == null)
+        {
+            _editPanel.IsEnabled = false;
+            _selectedReservation = null;
+            return;
+        }
+
+        _selectedReservation = _reservations?.ElementAtOrDefault(_reservationListBox.SelectedIndex);
+        if (_selectedReservation == null) return;
+        _editPanel.IsEnabled = true;
+        if (_statusTextBlock != null) _statusTextBlock.Text = "";
+        if (_subjectComboBox != null && _subjects != null)
+        {
+            var subjectName = _selectedReservation.Data.GetValueOrDefault("Subject");
+            var subject = _subjects.FirstOrDefault(s => s.Name == subjectName);
+            if (subject != null) _subjectComboBox.SelectedIndex = _subjects.IndexOf(subject);
+        }
+
+        if (_datePicker != null)
+            if (_selectedReservation.Data.TryGetValue("Date", out var dateStr) &&
+                DateTime.TryParse(dateStr, CultureInfo.InvariantCulture, out var date))
+                _datePicker.SelectedDate = date;
+
+        if (_timeTextBox != null) _timeTextBox.Text = _selectedReservation.Data.GetValueOrDefault("Time", "15:00");
+        if (_maxCapacityNumericUpDown != null)
+        {
+            if (_selectedReservation.Data.TryGetValue("MaxCapacity", out var capacityStr) &&
+                int.TryParse(capacityStr, out var capacity))
+                _maxCapacityNumericUpDown.Value = capacity;
+            else
+                _maxCapacityNumericUpDown.Value = 5;
+        }
+    }
+
+    private void OnSaveClicked(object? sender, RoutedEventArgs e)
+    {
+        if (_context == null || _statusTextBlock == null || _subjectComboBox == null || _datePicker == null ||
+            _timeTextBox == null || _maxCapacityNumericUpDown == null) return;
+        if (_subjectComboBox.SelectedItem == null || string.IsNullOrWhiteSpace(_timeTextBox.Text) ||
+            _datePicker.SelectedDate == null)
+        {
+            _statusTextBlock.Text = "Hiba: Minden mező kitöltése kötelező!";
+            _statusTextBlock.Foreground = Brushes.Red;
+            return;
+        }
+
+        var data = new Dictionary<string, string>
+        {
+            { "Subject", _subjectComboBox.SelectedItem.ToString() ?? "" },
+            { "Date", _datePicker.SelectedDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) },
+            { "Time", _timeTextBox.Text },
+            { "MaxCapacity", ((int)_maxCapacityNumericUpDown.Value).ToString(CultureInfo.InvariantCulture) }
+        };
+        var idToSave = _selectedReservation?.Id;
+        var newId = _context.SaveEntity(EntityType, data, idToSave);
+        if (newId > 0)
+        {
+            _statusTextBlock.Text = "Sikeres mentés!";
+            _statusTextBlock.Foreground = Brushes.Green;
+            if (_editPanel != null) _editPanel.IsEnabled = false;
+            LoadReservations();
+        }
+        else
+        {
+            _statusTextBlock.Text = "Hiba történt a mentés során.";
+            _statusTextBlock.Foreground = Brushes.Red;
+        }
+    }
+}

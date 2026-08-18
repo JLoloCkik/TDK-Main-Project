@@ -1,0 +1,15 @@
+[2026-08-16 18:11:58] [TESZT #8] [TIMEOUT]
+[TIMEOUT HIBA] A teszt túllépte a(z) 60 másodperces korlátot!
+----------------------------------------
+[2026-08-16 18:13:43] [TESZT #18] [TIMEOUT]
+[TIMEOUT HIBA] A teszt túllépte a(z) 60 másodperces korlátot!
+----------------------------------------
+[2026-08-16 18:14:45] [TESZT #20] [TIMEOUT]
+[TIMEOUT HIBA] A teszt túllépte a(z) 60 másodperces korlátot!
+----------------------------------------
+[2026-08-16 18:17:29] [TESZT #47] [TIMEOUT]
+[TIMEOUT HIBA] A teszt túllépte a(z) 60 másodperces korlátot!
+----------------------------------------
+[2026-08-16 18:20:50] [TESZT #59] [TIMEOUT]
+[TIMEOUT HIBA] A teszt túllépte a(z) 60 másodperces korlátot!
+----------------------------------------

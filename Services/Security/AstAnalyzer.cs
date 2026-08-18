@@ -50,8 +50,8 @@ public class AstAnalyzer
 
         try
         {
-            SyntaxTree tree = CSharpSyntaxTree.ParseText(sourceCode);
-            SyntaxNode root = tree.GetRoot();
+            var tree = CSharpSyntaxTree.ParseText(sourceCode);
+            var root = tree.GetRoot();
 
             if (root.DescendantNodes().OfType<UnsafeStatementSyntax>().Any() ||
                 root.DescendantTokens().Any(t => t.IsKind(SyntaxKind.UnsafeKeyword)))
@@ -59,22 +59,22 @@ public class AstAnalyzer
                 violationMessage = "Biztonsági hiba: 'unsafe' kódblokk használata szigorúan tiltott!";
                 return false;
             }
-         
+
             var usingDirectives = root.DescendantNodes().OfType<UsingDirectiveSyntax>();
             foreach (var usingDir in usingDirectives)
             {
-                string ns = usingDir.Name?.ToString() ?? string.Empty;
+                var ns = usingDir.Name?.ToString() ?? string.Empty;
                 if (!IsNamespaceAllowed(ns))
                 {
                     violationMessage = $"Biztonsági hiba: Nem engedélyezett névtér használata: 'using {ns};'";
                     return false;
                 }
             }
-            
+
             var qualifiedNames = root.DescendantNodes().OfType<QualifiedNameSyntax>();
             foreach (var qn in qualifiedNames)
             {
-                string fullName = qn.ToString();
+                var fullName = qn.ToString();
                 if (IsBannedName(fullName))
                 {
                     violationMessage = $"Biztonsági hiba: Tiltott típus/névtér hivatkozás észlelve: '{fullName}'";
@@ -88,7 +88,7 @@ public class AstAnalyzer
                 violationMessage = "Biztonsági hiba: 'typeof()' reflection használata tiltott!";
                 return false;
             }
-            
+
             var identifierNames = root.DescendantNodes().OfType<IdentifierNameSyntax>();
             foreach (var id in identifierNames)
             {
@@ -100,7 +100,8 @@ public class AstAnalyzer
 
                 if (BannedTypesAndMethods.Contains(id.Identifier.Text))
                 {
-                    violationMessage = $"Biztonsági hiba: Tiltott típus/osztály használata észlelve: '{id.Identifier.Text}'";
+                    violationMessage =
+                        $"Biztonsági hiba: Tiltott típus/osztály használata észlelve: '{id.Identifier.Text}'";
                     return false;
                 }
             }
@@ -108,12 +109,12 @@ public class AstAnalyzer
             var invocationExpressions = root.DescendantNodes().OfType<InvocationExpressionSyntax>();
             foreach (var invocation in invocationExpressions)
             {
-                string callText = invocation.Expression.ToString();
+                var callText = invocation.Expression.ToString();
 
                 // If the invoked element includes GetType, Invoke, Start, etc.
-                if (callText.EndsWith(".GetType") || 
-                    callText.EndsWith(".Invoke") || 
-                    callText.Contains("GetMethod") || 
+                if (callText.EndsWith(".GetType") ||
+                    callText.EndsWith(".Invoke") ||
+                    callText.Contains("GetMethod") ||
                     callText.Contains("GetProperty") ||
                     callText.Contains("GetField"))
                 {
@@ -137,13 +138,11 @@ public class AstAnalyzer
             return true;
 
 
-        if (ns.StartsWith("Avalonia.", StringComparison.Ordinal) && 
-            (ns.StartsWith("Avalonia.Controls", StringComparison.Ordinal) || 
-             ns.StartsWith("Avalonia.Layout", StringComparison.Ordinal) || 
+        if (ns.StartsWith("Avalonia.", StringComparison.Ordinal) &&
+            (ns.StartsWith("Avalonia.Controls", StringComparison.Ordinal) ||
+             ns.StartsWith("Avalonia.Layout", StringComparison.Ordinal) ||
              ns.StartsWith("Avalonia.Media", StringComparison.Ordinal)))
-        {
             return true;
-        }
 
         return false;
     }
@@ -151,7 +150,6 @@ public class AstAnalyzer
     private bool IsBannedName(string fullName)
     {
         foreach (var banned in BannedTypesAndMethods)
-        {
             if (fullName.Contains(banned, StringComparison.OrdinalIgnoreCase) ||
                 fullName.StartsWith("System.Diagnostics", StringComparison.OrdinalIgnoreCase) ||
                 fullName.StartsWith("System.Reflection", StringComparison.OrdinalIgnoreCase) ||
@@ -159,10 +157,8 @@ public class AstAnalyzer
                 fullName.StartsWith("System.Net", StringComparison.OrdinalIgnoreCase) ||
                 fullName.StartsWith("System.Runtime", StringComparison.OrdinalIgnoreCase) ||
                 fullName.StartsWith("Microsoft.Win32", StringComparison.OrdinalIgnoreCase))
-            {
                 return true;
-            }
-        }
+
         return false;
     }
 }

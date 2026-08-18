@@ -2,27 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
+using Kreta.Core;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
-using Kreta.Core;
 
 namespace Kreta.Services.Database;
 
 public class KretaDbContext : DbContext
 {
-    public DbSet<User> Users => Set<User>();
-    public DbSet<Subject> Subjects => Set<Subject>();
-    public DbSet<Grade> Grades => Set<Grade>();
-    public DbSet<Lesson> Lessons => Set<Lesson>();
-
-    /// <summary>
-    /// Table for entities usable for general, arbitrary new features.
-    /// ALL new data that Gemini wants to store outside the fixed domain classes (Grade, Lesson,
-    /// Subject, User), with a self-chosen EntityType label, goes here
-    /// (e.g. notice board / "NoticeMessage", events, votes, etc.).
-    /// </summary>
-    public DbSet<GenericRecord> GenericRecords => Set<GenericRecord>();
-
     public KretaDbContext()
     {
         // Ensure that the SQLite file and tables are created according to schema
@@ -31,8 +18,8 @@ public class KretaDbContext : DbContext
     }
 
     /// <summary>
-    /// Testability constructor: allows tests to inject their own (e.g. temporary file or
-    /// in-memory) SQLite connection instead of using the real evol_kreta.db.
+    ///     Testability constructor: allows tests to inject their own (e.g. temporary file or
+    ///     in-memory) SQLite connection instead of using the real evol_kreta.db.
     /// </summary>
     public KretaDbContext(DbContextOptions<KretaDbContext> options) : base(options)
     {
@@ -40,22 +27,32 @@ public class KretaDbContext : DbContext
         EnsureGenericRecordsTableExists();
     }
 
+    public DbSet<User> Users => Set<User>();
+    public DbSet<Subject> Subjects => Set<Subject>();
+    public DbSet<Grade> Grades => Set<Grade>();
+    public DbSet<Lesson> Lessons => Set<Lesson>();
+
+    /// <summary>
+    ///     Table for entities usable for general, arbitrary new features.
+    ///     ALL new data that Gemini wants to store outside the fixed domain classes (Grade, Lesson,
+    ///     Subject, User), with a self-chosen EntityType label, goes here
+    ///     (e.g. notice board / "NoticeMessage", events, votes, etc.).
+    /// </summary>
+    public DbSet<GenericRecord> GenericRecords => Set<GenericRecord>();
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
-        if (!optionsBuilder.IsConfigured)
-        {
-            optionsBuilder.UseSqlite("Data Source=evol_kreta.db");
-        }
+        if (!optionsBuilder.IsConfigured) optionsBuilder.UseSqlite("Data Source=evol_kreta.db");
     }
 
     /// <summary>
-    /// Database.EnsureCreated() ONLY creates the full schema if the database file
-    /// DID NOT EXIST YET. Since many evol_kreta.db files already existed before the
-    /// introduction of the GenericRecords table (with User/Grade/Lesson/Subject tables),
-    /// EnsureCreated() DOES NOT insert the new table into them retrospectively.
-    /// This method uses IF NOT EXISTS to ensure, independently of the file,
-    /// that the GenericRecords table always exists - on both old and new database files alike,
-    /// without data loss (without deleting evol_kreta.db).
+    ///     Database.EnsureCreated() ONLY creates the full schema if the database file
+    ///     DID NOT EXIST YET. Since many evol_kreta.db files already existed before the
+    ///     introduction of the GenericRecords table (with User/Grade/Lesson/Subject tables),
+    ///     EnsureCreated() DOES NOT insert the new table into them retrospectively.
+    ///     This method uses IF NOT EXISTS to ensure, independently of the file,
+    ///     that the GenericRecords table always exists - on both old and new database files alike,
+    ///     without data loss (without deleting evol_kreta.db).
     /// </summary>
     private void EnsureGenericRecordsTableExists()
     {
@@ -136,8 +133,14 @@ public class KretaDbContext : DbContext
         if (!Lessons.Any())
         {
             Lessons.AddRange(
-                new Lesson { Id = 1, ClassName = "9.A", SubjectName = "Matematika", Room = "101", Date = DateTime.Now.AddHours(1) },
-                new Lesson { Id = 2, ClassName = "9.A", SubjectName = "Történelem", Room = "202", Date = DateTime.Now.AddHours(2) }
+                new Lesson
+                {
+                    Id = 1, ClassName = "9.A", SubjectName = "Matematika", Room = "101", Date = DateTime.Now.AddHours(1)
+                },
+                new Lesson
+                {
+                    Id = 2, ClassName = "9.A", SubjectName = "Történelem", Room = "202", Date = DateTime.Now.AddHours(2)
+                }
             );
             SaveChanges();
         }

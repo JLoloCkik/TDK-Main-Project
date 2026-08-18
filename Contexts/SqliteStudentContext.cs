@@ -33,10 +33,7 @@ public class SqliteStudentContext : IStudentContext
     public List<Lesson> GetMyLessons()
     {
         var profile = GetMyProfile();
-        if (profile == null || string.IsNullOrEmpty(profile.ClassName))
-        {
-            return new List<Lesson>();
-        }
+        if (profile == null || string.IsNullOrEmpty(profile.ClassName)) return new List<Lesson>();
 
         return _dbContext.Lessons
             .Where(l => l.ClassName == profile.ClassName)

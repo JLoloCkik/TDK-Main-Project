@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 namespace Kreta.Services.Git;
 
 /// <summary>
-/// Service responsible for automatically executing Git commands and pushing to the 'ai-dev' GitHub branch.
+///     Service responsible for automatically executing Git commands and pushing to the 'ai-dev' GitHub branch.
 /// </summary>
 public class GitService : IGitService
 {
@@ -18,7 +18,7 @@ public class GitService : IGitService
     }
 
     /// <summary>
-    /// Adds the modified or new C# file, commits it, and pushes it to the GitHub 'ai-dev' branch.
+    ///     Adds the modified or new C# file, commits it, and pushes it to the GitHub 'ai-dev' branch.
     /// </summary>
     public async Task<bool> CommitAndPushAsync(string filePath, string commitMessage, string branchName = "ai-dev")
     {
@@ -75,7 +75,8 @@ public class GitService : IGitService
                 return false;
             }
 
-            Console.WriteLine($"[Git Siker] A(z) {Path.GetFileName(filePath)} fájl sikeresen feltöltve a GitHub '{branchName}' ágára!");
+            Console.WriteLine(
+                $"[Git Siker] A(z) {Path.GetFileName(filePath)} fájl sikeresen feltöltve a GitHub '{branchName}' ágára!");
             return true;
         }
         catch (Exception ex)
@@ -86,7 +87,7 @@ public class GitService : IGitService
     }
 
     /// <summary>
-    /// Removes the deleted C# file from the Git repository and pushes the deletion commit to the remote branch.
+    ///     Removes the deleted C# file from the Git repository and pushes the deletion commit to the remote branch.
     /// </summary>
     public async Task<bool> RemoveAndPushAsync(string filePath, string commitMessage, string branchName = "ai-dev")
     {
@@ -129,11 +130,13 @@ public class GitService : IGitService
 
             if (!pushResult.Success)
             {
-                Console.WriteLine($"[Git Hiba] A törlés push-olása sikertelen volt még force móddal is:\n{pushResult.Output}");
+                Console.WriteLine(
+                    $"[Git Hiba] A törlés push-olása sikertelen volt még force móddal is:\n{pushResult.Output}");
                 return false;
             }
 
-            Console.WriteLine($"[Git Siker] A(z) {Path.GetFileName(filePath)} fájl törölve a GitHub '{branchName}' ágáról!");
+            Console.WriteLine(
+                $"[Git Siker] A(z) {Path.GetFileName(filePath)} fájl törölve a GitHub '{branchName}' ágáról!");
             return true;
         }
         catch (Exception ex)
@@ -157,23 +160,17 @@ public class GitService : IGitService
         };
 
         using var process = Process.Start(psi);
-        if (process == null)
-        {
-            throw new Exception("Nem sikerült elindítani a Git folyamatot.");
-        }
+        if (process == null) throw new Exception("Nem sikerült elindítani a Git folyamatot.");
 
-        string output = await process.StandardOutput.ReadToEndAsync();
-        string error = await process.StandardError.ReadToEndAsync();
+        var output = await process.StandardOutput.ReadToEndAsync();
+        var error = await process.StandardError.ReadToEndAsync();
         await process.WaitForExitAsync();
 
         var result = output + "\n" + error;
-        bool isNothingToCommit = result.Contains("nothing to commit");
-        bool success = process.ExitCode == 0 || isNothingToCommit;
+        var isNothingToCommit = result.Contains("nothing to commit");
+        var success = process.ExitCode == 0 || isNothingToCommit;
 
-        if (!success)
-        {
-            Console.WriteLine($"[Git Parancs Hiba ({arguments})]:\n{result}");
-        }
+        if (!success) Console.WriteLine($"[Git Parancs Hiba ({arguments})]:\n{result}");
 
         return new GitCommandResult { Success = success, Output = result };
     }

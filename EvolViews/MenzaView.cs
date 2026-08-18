@@ -1,0 +1,118 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Layout;
+using Avalonia.Media;
+using Kreta.Contexts;
+using Kreta.Core;
+
+public class MenzaView : IEvolView
+{
+    private const string MenuEntityType = "CafeteriaMenu";
+    private const string BalanceEntityType = "StudentBalance";
+    private readonly IStudentContext? _context;
+    private TextBlock? _balanceTextBlock;
+    private ListBox? _menuListBox;
+    private TextBlock? _statusTextBlock;
+
+    public MenzaView()
+    {
+    }
+
+    public MenzaView(IStudentContext context)
+    {
+        _context = context;
+    }
+
+    public new string Name => "Menza";
+    public string Description => "Heti menza étlap és egyenleg megtekintése.";
+
+    public Control CreateView()
+    {
+        var mainPanel = new StackPanel { Orientation = Orientation.Vertical, Spacing = 10, Margin = new Thickness(15) };
+        _statusTextBlock = new TextBlock { Text = "Adatok betöltése...", FontStyle = FontStyle.Italic };
+        _balanceTextBlock = new TextBlock
+            { FontSize = 18, FontWeight = FontWeight.Bold, VerticalAlignment = VerticalAlignment.Center };
+        _menuListBox = new ListBox();
+        var balancePanel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
+        balancePanel.Children.Add(new TextBlock
+            { Text = "Aktuális egyenleg:", FontSize = 18, VerticalAlignment = VerticalAlignment.Center });
+        balancePanel.Children.Add(_balanceTextBlock);
+        mainPanel.Children.Add(new TextBlock { Text = "Menza", FontSize = 24, FontWeight = FontWeight.Bold });
+        mainPanel.Children.Add(balancePanel);
+        mainPanel.Children.Add(new Separator());
+        mainPanel.Children.Add(new TextBlock { Text = "Heti menü", FontSize = 20, FontWeight = FontWeight.SemiBold });
+        mainPanel.Children.Add(_menuListBox);
+        mainPanel.Children.Add(_statusTextBlock);
+        LoadData();
+        return mainPanel;
+    }
+
+    private void LoadData()
+    {
+        if (_context == null || _statusTextBlock == null || _balanceTextBlock == null || _menuListBox == null) return;
+        try
+        {
+            _statusTextBlock.Text = "Adatok betöltése...";
+            _statusTextBlock.IsVisible = true;
+            var currentUser = _context.GetMyProfile();
+            if (currentUser != null)
+            {
+                var balanceRecords = _context.QueryEntities(BalanceEntityType);
+                var myBalanceRecord = balanceRecords.FirstOrDefault(b =>
+                    b.Data.TryGetValue("StudentId", out var studentId) && studentId == currentUser.Id.ToString());
+                if (myBalanceRecord != null && myBalanceRecord.Data.TryGetValue("Balance", out var balanceValue))
+                {
+                    if (decimal.TryParse(balanceValue, NumberStyles.Any, CultureInfo.InvariantCulture, out var balance))
+                        _balanceTextBlock.Text = $"{balance.ToString("N0", CultureInfo.InvariantCulture)} Ft";
+                    else
+                        _balanceTextBlock.Text = "Érvénytelen összeg";
+                }
+                else
+                {
+                    _balanceTextBlock.Text = "Nincs adat";
+                }
+            }
+            else
+            {
+                _balanceTextBlock.Text = "Felhasználó nem azonosítható";
+            }
+
+            var menuItems = _context.QueryEntities(MenuEntityType);
+            var sortedMenu = menuItems
+                .Where(m => m.Data.ContainsKey("Date") && DateTime.TryParse(m.Data["Date"],
+                    CultureInfo.InvariantCulture, DateTimeStyles.None, out _)).OrderBy(m =>
+                    DateTime.Parse(m.Data["Date"], CultureInfo.InvariantCulture));
+            if (sortedMenu.Any())
+                _menuListBox.ItemsSource = sortedMenu.Select(item =>
+                {
+                    var data = item.Data;
+                    DateTime.TryParse(data.GetValueOrDefault("Date"), CultureInfo.InvariantCulture, DateTimeStyles.None,
+                        out var date);
+                    var day = data.GetValueOrDefault("Day", "Ismeretlen nap");
+                    var soup = data.GetValueOrDefault("Soup", "-");
+                    var mainCourse = data.GetValueOrDefault("MainCourse", "-");
+                    var itemPanel = new StackPanel { Margin = new Thickness(5) };
+                    itemPanel.Children.Add(new TextBlock
+                        { Text = $"{day} ({date:yyyy.MM.dd.})", FontWeight = FontWeight.Bold });
+                    itemPanel.Children.Add(new TextBlock
+                        { Text = $"  Leves: {soup}", Margin = new Thickness(10, 2, 0, 0) });
+                    itemPanel.Children.Add(new TextBlock
+                        { Text = $"  Főétel: {mainCourse}", Margin = new Thickness(10, 2, 0, 0) });
+                    return new ListBoxItem { Content = itemPanel };
+                }).ToList();
+            else
+                _menuListBox.ItemsSource = new List<string> { "A heti menü nem elérhető." };
+            _statusTextBlock.IsVisible = false;
+        }
+        catch (Exception ex)
+        {
+            _statusTextBlock.Text = $"Hiba történt az adatok betöltése közben: {ex.Message}";
+            _statusTextBlock.Foreground = Brushes.Red;
+            _statusTextBlock.IsVisible = true;
+        }
+    }
+}

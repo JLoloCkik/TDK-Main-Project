@@ -9,13 +9,13 @@ using Kreta.Services.Security;
 namespace Kreta.Services.Evolution;
 
 /// <summary>
-/// Service responsible for coordinating AI code generation, self-healing, saving to disk, deletion, and Git push.
+///     Service responsible for coordinating AI code generation, self-healing, saving to disk, deletion, and Git push.
 /// </summary>
 public class EvolutionService : IEvolutionService
 {
     private readonly IAiService _aiService;
-    private readonly IDynamicLoader _dynamicLoader;
     private readonly AstAnalyzer _astAnalyzer;
+    private readonly IDynamicLoader _dynamicLoader;
     private readonly IGitService _gitService;
 
     public EvolutionService()
@@ -24,8 +24,8 @@ public class EvolutionService : IEvolutionService
     }
 
     public EvolutionService(
-        IAiService aiService, 
-        IDynamicLoader dynamicLoader, 
+        IAiService aiService,
+        IDynamicLoader dynamicLoader,
         AstAnalyzer astAnalyzer,
         IGitService gitService)
     {
@@ -39,16 +39,17 @@ public class EvolutionService : IEvolutionService
         string? targetViewFilePath = null)
     {
         Console.WriteLine($"[Evolution] Processing new request: '{prompt}' ({currentRole})" +
-            (string.IsNullOrWhiteSpace(targetViewFilePath) ? "..." : $" [Selected view: {Path.GetFileName(targetViewFilePath)}]..."));
+                          (string.IsNullOrWhiteSpace(targetViewFilePath)
+                              ? "..."
+                              : $" [Selected view: {Path.GetFileName(targetViewFilePath)}]..."));
 
         string? history = null;
 
-        for (int attempt = 1; attempt <= maxAttempts; attempt++)
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
             if (attempt > 1)
-            {
-                Console.WriteLine($"[Evolution - Self-Healing] Retry ({attempt}/{maxAttempts}) fixing previous compilation error...");
-            }
+                Console.WriteLine(
+                    $"[Evolution - Self-Healing] Retry ({attempt}/{maxAttempts}) fixing previous compilation error...");
 
             var aiResponse = await _aiService.GenerateFeatureAsync(prompt, currentRole, history, targetViewFilePath);
 
@@ -62,14 +63,14 @@ public class EvolutionService : IEvolutionService
                     IsRejectedAction = true,
                     ViewName = aiResponse.ViewName ?? "Access Denied",
                     Description = aiResponse.Description ?? "You do not have permission for this operation.",
-                    ErrorMessage = "❌ Access denied! (RBAC error)"
+                    ErrorMessage = "Access denied! (RBAC error)"
                 };
             }
 
             // 2. Handle deletion requested by AI
             if (aiResponse.Action == "DELETE" && !string.IsNullOrWhiteSpace(aiResponse.ViewName))
             {
-                string evolDir = PathHelper.GetEvolViewsDirectory();
+                var evolDir = PathHelper.GetEvolViewsDirectory();
                 var matchedFiles = Directory.GetFiles(evolDir, $"*{aiResponse.ViewName}*.cs");
 
                 foreach (var file in matchedFiles)
@@ -88,25 +89,20 @@ public class EvolutionService : IEvolutionService
             }
 
             if (string.IsNullOrWhiteSpace(aiResponse.SourceCode))
-            {
                 return new EvolveResult
                 {
                     IsSuccess = false,
                     ErrorMessage = "The generated code was empty."
                 };
-            }
 
             var result = await EvolveFeatureAsync(
-                aiResponse.ViewName ?? "New View", 
-                aiResponse.Description ?? "AI generated feature", 
-                aiResponse.SourceCode, 
+                aiResponse.ViewName ?? "New View",
+                aiResponse.Description ?? "AI generated feature",
+                aiResponse.SourceCode,
                 aiResponse.TestCode ?? string.Empty
             );
 
-            if (result.IsSuccess)
-            {
-                return result;
-            }
+            if (result.IsSuccess) return result;
 
             history = result.ErrorMessage;
             Console.WriteLine($"[Evolution - Compilation Error on attempt #{attempt}]: {history}");
@@ -119,18 +115,17 @@ public class EvolutionService : IEvolutionService
         };
     }
 
-    public async Task<EvolveResult> EvolveFeatureAsync(string viewName, string description, string sourceCode, string testCode)
+    public async Task<EvolveResult> EvolveFeatureAsync(string viewName, string description, string sourceCode,
+        string testCode)
     {
         if (string.IsNullOrWhiteSpace(sourceCode))
-        {
             return new EvolveResult
             {
                 IsSuccess = false,
                 ErrorMessage = "The provided source code is empty."
             };
-        }
 
-        if (!_astAnalyzer.IsCodeSafe(sourceCode, out string securityViolation))
+        if (!_astAnalyzer.IsCodeSafe(sourceCode, out var securityViolation))
         {
             Console.WriteLine($"[Evolution - Security Error] {securityViolation}");
             return new EvolveResult
@@ -140,19 +135,15 @@ public class EvolutionService : IEvolutionService
             };
         }
 
-        string evolViewsDirectory = PathHelper.GetEvolViewsDirectory();
-        
-        string safeViewName = string.Concat(viewName.Split(Path.GetInvalidFileNameChars())).Replace(" ", "_");
-        if (string.IsNullOrWhiteSpace(safeViewName))
-        {
-            safeViewName = $"EvolView_{Guid.NewGuid():N}";
-        }
+        var evolViewsDirectory = PathHelper.GetEvolViewsDirectory();
+
+        var safeViewName = string.Concat(viewName.Split(Path.GetInvalidFileNameChars())).Replace(" ", "_");
+        if (string.IsNullOrWhiteSpace(safeViewName)) safeViewName = $"EvolView_{Guid.NewGuid():N}";
 
         // Deduplication filtering: Delete previous existing version of files with the same topic to avoid duplicate tabs
         var basePrefix = safeViewName.Split('_')[0];
         var existingFiles = Directory.GetFiles(evolViewsDirectory, $"*{basePrefix}*.cs");
         foreach (var oldFile in existingFiles)
-        {
             try
             {
                 Console.WriteLine($"[Evolution - Modify/Cleanup] Deleting previous version: {oldFile}");
@@ -162,9 +153,8 @@ public class EvolutionService : IEvolutionService
             {
                 // Silently ignore
             }
-        }
 
-        string filePath = Path.Combine(evolViewsDirectory, $"{safeViewName}.cs");
+        var filePath = Path.Combine(evolViewsDirectory, $"{safeViewName}.cs");
 
         await File.WriteAllTextAsync(filePath, sourceCode);
 
@@ -175,10 +165,7 @@ public class EvolutionService : IEvolutionService
             Console.WriteLine($"[Evolution - Compilation Error] Code failed to compile. Deleting file: {filePath}");
             try
             {
-                if (File.Exists(filePath))
-                {
-                    File.Delete(filePath);
-                }
+                if (File.Exists(filePath)) File.Delete(filePath);
             }
             catch (Exception ex)
             {
@@ -213,6 +200,7 @@ public class EvolutionService : IEvolutionService
                 File.Delete(filePath);
                 return true;
             }
+
             return false;
         }
         catch (Exception ex)
@@ -235,9 +223,8 @@ public class EvolutionService : IEvolutionService
         try
         {
             return await _gitService.CommitAndPushAsync(
-                filePath: filePath,
-                commitMessage: $"New accepted feature added/modified: {viewName}",
-                branchName: "ai-dev"
+                filePath,
+                $"New accepted feature added/modified: {viewName}"
             );
         }
         catch (Exception ex)
