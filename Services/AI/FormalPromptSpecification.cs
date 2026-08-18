@@ -3,43 +3,43 @@ using System.Collections.Generic;
 namespace Kreta.Services.AI;
 
 /// <summary>
-/// A kötetlen felhasználói promptból generált, formálisan specifikált JSON modell (DTO).
-/// Ez képezi a kódgeneráló LLM számára a szigorú specifikációs szerződést.
+/// Formally specified JSON model (DTO) generated from an unstructured user prompt.
+/// This forms the strict specification contract for the code generating LLM.
 /// </summary>
 public class FormalPromptSpecification
 {
     /// <summary>
-    /// A megcélzott szimulált szerepkör (Student, Teacher, Director).
+    /// The targeted simulated role (Student, Teacher, Director).
     /// </summary>
     public string TargetRole { get; set; } = string.Empty;
 
     /// <summary>
-    /// A kérés tisztított, szakmai/funkcionális összefoglalója.
+    /// The cleaned, professional/functional summary of the request.
     /// </summary>
     public string NormalizedIntent { get; set; } = string.Empty;
 
     /// <summary>
-    /// A felületen kötelezően megvalósítandó funkciók listája.
+    /// List of features that must be implemented on the UI.
     /// </summary>
     public List<string> RequestedFeatures { get; set; } = new();
 
     /// <summary>
-    /// A C# kódban kötelezően használandó kontextus metódusok (pl. GetMyGrades, AddGrade).
+    /// Context methods that must be used in the C# code (e.g. GetMyGrades, AddGrade).
     /// </summary>
     public List<string> RequiredContextMethods { get; set; } = new();
 
     /// <summary>
-    /// Az adott szerepkör számára szigorúan tiltott metódusok és műveletek.
+    /// Methods and operations strictly forbidden for the given role.
     /// </summary>
     public List<string> ForbiddenContextMethods { get; set; } = new();
 
     /// <summary>
-    /// Igaz, ha a kérés megsérti a Szerepkör-alapú Hozzáférés-vezérlést (RBAC).
+    /// True if the request violates Role-Based Access Control (RBAC).
     /// </summary>
     public bool IsRoleViolating { get; set; }
 
     /// <summary>
-    /// Az elutasítás indoklása, ha IsRoleViolating = true.
+    /// The justification for the rejection, if IsRoleViolating = true.
     /// </summary>
     public string ViolationReason { get; set; } = string.Empty;
 }

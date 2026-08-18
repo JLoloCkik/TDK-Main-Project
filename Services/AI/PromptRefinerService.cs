@@ -9,8 +9,8 @@ using Kreta.Core;
 namespace Kreta.Services.AI;
 
 /// <summary>
-/// Előfeldolgozó LLM szolgáltatás, amely a kötetlen nyers promptot formális JSON specifikációvá alakítja,
-/// és elvégzi az korai RBAC elő-szűrést a C# kódgenerálás előtt.
+/// Preprocessing LLM service that transforms the unstructured raw prompt into a formal JSON specification,
+/// and performs early RBAC pre-filtering before C# code generation.
 /// </summary>
 public class PromptRefinerService : IPromptRefinerService
 {
@@ -75,8 +75,8 @@ TASK:
             generationConfig = new
             {
                 responseMimeType = "application/json",
-                // A specifikáció rövid, strukturált JSON - nincs szükség "gondolkodásra" (thinking),
-                // ez gyorsabbá és token-hatékonyabbá teszi a hívást, és csökkenti a MAX_TOKENS kockázatát.
+                // The specification is a short, structured JSON - no need for "thinking",
+                // this makes the call faster, more token-efficient, and reduces MAX_TOKENS risk.
                 thinkingConfig = new { thinkingBudget = 0 },
                 responseSchema = new
                 {

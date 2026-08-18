@@ -4,22 +4,22 @@ using Kreta.Core;
 namespace Kreta.Services.AI;
 
 /// <summary>
-/// Az AI kódgeneráló és kontextus-elemző szolgáltatás interfésze.
+/// Interface for the AI code generation and context analysis service.
 /// </summary>
 public interface IAiService
 {
     /// <summary>
-    /// Egyszerű funkciógenerálás egyetlen prompt alapján.
+    /// Simple feature generation based on a single prompt.
     /// </summary>
     Task<string> GenerateFeatureAsync(string prompt);
 
     /// <summary>
-    /// Szerepkör-alapú és előzmény-tudatos funkciógenerálás, módosítás vagy törlés.
+    /// Role-based and history-aware feature generation, modification, or deletion.
     /// </summary>
     /// <param name="targetViewFilePath">
-    /// Opcionális: annak a jelenleg kijelölt/megnyitott nézetnek a fájlútja, amelyet a felhasználó
-    /// a felületen épp néz. Ha meg van adva, az AI ennek a TELJES, meglévő forráskódját kapja meg
-    /// és azt módosítja közvetlenül, ahelyett hogy a nézet-lista alapján kellene kitalálnia.
+    /// Optional: the file path of the currently selected/opened view that the user
+    /// is looking at on the UI. If provided, the AI receives its ENTIRE, existing source code
+    /// and modifies it directly, instead of having to guess based on the view list.
     /// </param>
     Task<AiEvolveResponse> GenerateFeatureAsync(string prompt, Role role, string? history = null,
         string? targetViewFilePath = null);

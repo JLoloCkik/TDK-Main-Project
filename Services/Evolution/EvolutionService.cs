@@ -9,7 +9,7 @@ using Kreta.Services.Security;
 namespace Kreta.Services.Evolution;
 
 /// <summary>
-/// Az AI kódgenerálás, önjavítás (self-healing), lemezre mentés, törlés és Git push koordinációjáért felelős szolgáltatás.
+/// Service responsible for coordinating AI code generation, self-healing, saving to disk, deletion, and Git push.
 /// </summary>
 public class EvolutionService : IEvolutionService
 {
@@ -38,8 +38,8 @@ public class EvolutionService : IEvolutionService
     public async Task<EvolveResult> EvolveAsync(string prompt, Role currentRole, int maxAttempts = 3,
         string? targetViewFilePath = null)
     {
-        Console.WriteLine($"[Evolúció] Új kérés feldolgozása: '{prompt}' ({currentRole})" +
-            (string.IsNullOrWhiteSpace(targetViewFilePath) ? "..." : $" [Kijelölt nézet: {Path.GetFileName(targetViewFilePath)}]..."));
+        Console.WriteLine($"[Evolution] Processing new request: '{prompt}' ({currentRole})" +
+            (string.IsNullOrWhiteSpace(targetViewFilePath) ? "..." : $" [Selected view: {Path.GetFileName(targetViewFilePath)}]..."));
 
         string? history = null;
 
@@ -47,26 +47,26 @@ public class EvolutionService : IEvolutionService
         {
             if (attempt > 1)
             {
-                Console.WriteLine($"[Evolúció - Self-Healing] Újrapróbálkozás ({attempt}/{maxAttempts}) az előző fordítási hiba kijavításával...");
+                Console.WriteLine($"[Evolution - Self-Healing] Retry ({attempt}/{maxAttempts}) fixing previous compilation error...");
             }
 
             var aiResponse = await _aiService.GenerateFeatureAsync(prompt, currentRole, history, targetViewFilePath);
 
-            // 1. RBAC Guardrail elutasítás: Nem mentjük lelemezként!
+            // 1. RBAC Guardrail rejection: Do not save to disk!
             if (aiResponse.Action == "REJECT")
             {
-                Console.WriteLine("[Evolúció] RBAC elutasítás. Nincs fájlmentés.");
+                Console.WriteLine("[Evolution] RBAC rejection. No file saved.");
                 return new EvolveResult
                 {
                     IsSuccess = false,
                     IsRejectedAction = true,
-                    ViewName = aiResponse.ViewName ?? "Hozzáférés Megtagadva",
-                    Description = aiResponse.Description ?? "Nincs jogosultsága ehhez a művelethez.",
-                    ErrorMessage = "❌ Hozzáférés megtagadva! (RBAC hiba)"
+                    ViewName = aiResponse.ViewName ?? "Access Denied",
+                    Description = aiResponse.Description ?? "You do not have permission for this operation.",
+                    ErrorMessage = "❌ Access denied! (RBAC error)"
                 };
             }
 
-            // 2. AI által kért törlés kezelése
+            // 2. Handle deletion requested by AI
             if (aiResponse.Action == "DELETE" && !string.IsNullOrWhiteSpace(aiResponse.ViewName))
             {
                 string evolDir = PathHelper.GetEvolViewsDirectory();
@@ -75,7 +75,7 @@ public class EvolutionService : IEvolutionService
                 foreach (var file in matchedFiles)
                 {
                     await DiscardFeatureAsync(file);
-                    await _gitService.RemoveAndPushAsync(file, $"[AI Törlés] {aiResponse.ViewName} eltávolítva.");
+                    await _gitService.RemoveAndPushAsync(file, $"[AI Deletion] {aiResponse.ViewName} removed.");
                 }
 
                 return new EvolveResult
@@ -83,7 +83,7 @@ public class EvolutionService : IEvolutionService
                     IsSuccess = true,
                     IsDeletedAction = true,
                     ViewName = aiResponse.ViewName,
-                    Description = "A kijelölt funkció törölve lett."
+                    Description = "The selected feature was deleted."
                 };
             }
 
@@ -92,13 +92,13 @@ public class EvolutionService : IEvolutionService
                 return new EvolveResult
                 {
                     IsSuccess = false,
-                    ErrorMessage = "A generált kód üres volt."
+                    ErrorMessage = "The generated code was empty."
                 };
             }
 
             var result = await EvolveFeatureAsync(
-                aiResponse.ViewName ?? "Új Nézet", 
-                aiResponse.Description ?? "AI által generált funkció", 
+                aiResponse.ViewName ?? "New View", 
+                aiResponse.Description ?? "AI generated feature", 
                 aiResponse.SourceCode, 
                 aiResponse.TestCode ?? string.Empty
             );
@@ -109,13 +109,13 @@ public class EvolutionService : IEvolutionService
             }
 
             history = result.ErrorMessage;
-            Console.WriteLine($"[Evolúció - Fordítási Hiba az {attempt}. próbálkozásnál]: {history}");
+            Console.WriteLine($"[Evolution - Compilation Error on attempt #{attempt}]: {history}");
         }
 
         return new EvolveResult
         {
             IsSuccess = false,
-            ErrorMessage = $"Nem sikerült lefordítani a kért funkciót {maxAttempts} próbálkozás után sem. Utolsó hiba: {history}"
+            ErrorMessage = $"Failed to compile requested feature after {maxAttempts} attempts. Last error: {history}"
         };
     }
 
@@ -126,17 +126,17 @@ public class EvolutionService : IEvolutionService
             return new EvolveResult
             {
                 IsSuccess = false,
-                ErrorMessage = "A megadott forráskód üres."
+                ErrorMessage = "The provided source code is empty."
             };
         }
 
         if (!_astAnalyzer.IsCodeSafe(sourceCode, out string securityViolation))
         {
-            Console.WriteLine($"[Evolúció - Biztonsági Hiba] {securityViolation}");
+            Console.WriteLine($"[Evolution - Security Error] {securityViolation}");
             return new EvolveResult
             {
                 IsSuccess = false,
-                ErrorMessage = $"Biztonsági szabálysértés: {securityViolation}"
+                ErrorMessage = $"Security violation: {securityViolation}"
             };
         }
 
@@ -148,19 +148,19 @@ public class EvolutionService : IEvolutionService
             safeViewName = $"EvolView_{Guid.NewGuid():N}";
         }
 
-        // Duplikáció szűrés: Töröljük a korábbi meglévő változatot az azonos témájú fájlokból, hogy ne legyenek duplikált fülek
+        // Deduplication filtering: Delete previous existing version of files with the same topic to avoid duplicate tabs
         var basePrefix = safeViewName.Split('_')[0];
         var existingFiles = Directory.GetFiles(evolViewsDirectory, $"*{basePrefix}*.cs");
         foreach (var oldFile in existingFiles)
         {
             try
             {
-                Console.WriteLine($"[Evolúció - Módosítás/Takarítás] Korábbi változat törlése: {oldFile}");
+                Console.WriteLine($"[Evolution - Modify/Cleanup] Deleting previous version: {oldFile}");
                 File.Delete(oldFile);
             }
             catch
             {
-                // Csendben figyelmen kívül hagyjuk
+                // Silently ignore
             }
         }
 
@@ -172,7 +172,7 @@ public class EvolutionService : IEvolutionService
 
         if (!loadResult.IsSuccess)
         {
-            Console.WriteLine($"[Evolúció - Fordítási Hiba] A kód nem fordult le. Fájl törlése: {filePath}");
+            Console.WriteLine($"[Evolution - Compilation Error] Code failed to compile. Deleting file: {filePath}");
             try
             {
                 if (File.Exists(filePath))
@@ -182,13 +182,13 @@ public class EvolutionService : IEvolutionService
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Takarítási hiba]: {ex.Message}");
+                Console.WriteLine($"[Cleanup error]: {ex.Message}");
             }
 
             return new EvolveResult
             {
                 IsSuccess = false,
-                ErrorMessage = $"Fordítási hiba: {loadResult.ErrorMessage}"
+                ErrorMessage = $"Compilation error: {loadResult.ErrorMessage}"
             };
         }
 
@@ -209,7 +209,7 @@ public class EvolutionService : IEvolutionService
         {
             if (!string.IsNullOrWhiteSpace(filePath) && File.Exists(filePath))
             {
-                Console.WriteLine($"[Evolúció - Elvetés] A funkció törlése a lemezről: {filePath}");
+                Console.WriteLine($"[Evolution - Discard] Deleting feature from disk: {filePath}");
                 File.Delete(filePath);
                 return true;
             }
@@ -217,7 +217,7 @@ public class EvolutionService : IEvolutionService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[Elvetési hiba]: {ex.Message}");
+            Console.WriteLine($"[Discard error]: {ex.Message}");
             return false;
         }
     }
@@ -226,23 +226,23 @@ public class EvolutionService : IEvolutionService
     {
         if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
         {
-            Console.WriteLine("[Git Push Hiba] A megadott fájl nem található a lemezen.");
+            Console.WriteLine("[Git Push Error] Specified file not found on disk.");
             return false;
         }
 
-        Console.WriteLine($"[Evolúció - Elfogadás] A funkció elfogadva ('{viewName}'). Git push indítása...");
+        Console.WriteLine($"[Evolution - Accept] Feature accepted ('{viewName}'). Starting Git push...");
 
         try
         {
             return await _gitService.CommitAndPushAsync(
                 filePath: filePath,
-                commitMessage: $"Új elfogadott funkció hozzáadva/módosítva: {viewName}",
+                commitMessage: $"New accepted feature added/modified: {viewName}",
                 branchName: "ai-dev"
             );
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[Git Push Hiba]: {ex.Message}");
+            Console.WriteLine($"[Git Push Error]: {ex.Message}");
             return false;
         }
     }

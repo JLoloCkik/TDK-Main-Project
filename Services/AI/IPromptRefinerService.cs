@@ -4,16 +4,16 @@ using Kreta.Core;
 namespace Kreta.Services.AI;
 
 /// <summary>
-/// A kötetlen természetes nyelvi promptokat formális JSON specifikációvá alakító szolgáltatás interfésze.
+/// Interface of the service that transforms unstructured natural language prompts into a formal JSON specification.
 /// </summary>
 public interface IPromptRefinerService
 {
     /// <summary>
-    /// Elemzi és normalizálja a nyers felhasználói kérést egy strukturált specifikációvá.
+    /// Analyzes and normalizes the raw user request into a structured specification.
     /// </summary>
-    /// <param name="rawPrompt">A felhasználó által beírt nyers szöveg.</param>
-    /// <param name="role">A jelenleg aktív szimulált szerepkör.</param>
-    /// <param name="apiKey">Gemini API kulcs.</param>
-    /// <returns>A formálisan specifikált prompt objektum.</returns>
+    /// <param name="rawPrompt">The raw text entered by the user.</param>
+    /// <param name="role">The currently active simulated role.</param>
+    /// <param name="apiKey">Gemini API key.</param>
+    /// <returns>The formally specified prompt object.</returns>
     Task<FormalPromptSpecification> RefinePromptAsync(string rawPrompt, Role role, string apiKey);
 }

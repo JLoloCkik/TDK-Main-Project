@@ -1,7 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="Kreta.MainWindow"
-        Title="EvolKréta - Önfejlesztő Iskolai Rendszer"
+        Title="EvolKréta - Self-Evolving School System"
         Width="1000" Height="650"
         MinWidth="850" MinHeight="550"
         WindowStartupLocation="CenterScreen"
@@ -15,19 +15,19 @@
                 <StackPanel Grid.Row="0" Margin="18,22,18,10">
                     <TextBlock Text="EvolKréta" FontSize="22" FontWeight="Bold" Foreground="White"
                                HorizontalAlignment="Center" />
-                    <TextBlock Text="Önfejlesztő Rendszer" FontSize="11" Foreground="#8FA3B8"
+                    <TextBlock Text="Self-Evolving System" FontSize="11" Foreground="#8FA3B8"
                                HorizontalAlignment="Center" Margin="0,4,0,0" />
                 </StackPanel>
 
                 <StackPanel Grid.Row="1" Margin="16,6,16,10">
-                    <TextBlock Text="SZIMULÁLT SZEREPKÖR" FontSize="10" FontWeight="SemiBold"
+                    <TextBlock Text="SIMULATED ROLE" FontSize="10" FontWeight="SemiBold"
                                Foreground="#6E85A0" Margin="2,0,0,6" />
                     <Border Background="#28394D" CornerRadius="8" Padding="2">
                         <ComboBox x:Name="RoleSelector" HorizontalAlignment="Stretch"
                                   SelectedIndex="0" Background="Transparent" BorderThickness="0" Foreground="White">
-                            <ComboBoxItem Content="Diák (Kovács János)" Tag="Student" />
-                            <ComboBoxItem Content="Tanár (Szabó Mária)" Tag="Teacher" />
-                            <ComboBoxItem Content="Igazgató (Nagy Péter)" Tag="Director" />
+                            <ComboBoxItem Content="Student (János Kovács)" Tag="Student" />
+                            <ComboBoxItem Content="Teacher (Mária Szabó)" Tag="Teacher" />
+                            <ComboBoxItem Content="Director (Péter Nagy)" Tag="Director" />
                         </ComboBox>
                     </Border>
                 </StackPanel>
@@ -40,9 +40,9 @@
                 <Border Grid.Row="3" Background="#182533" Padding="14,12">
                     <StackPanel Spacing="4">
                         <TextBlock x:Name="EvolverStatusText" FontSize="10" Foreground="#2ECC71"
-                                   Text="Evolúciós Motor: Aktív" TextWrapping="Wrap" />
+                                   Text="Evolution Engine: Active" TextWrapping="Wrap" />
                         <TextBlock x:Name="StatusText" FontSize="9" Foreground="#8FA3B8"
-                                   Text="Készen áll a generálásra és futtatásra." TextWrapping="Wrap" />
+                                   Text="Ready to generate and execute." TextWrapping="Wrap" />
                     </StackPanel>
                 </Border>
             </Grid>
@@ -54,13 +54,13 @@
                 <Border Background="#F4F6F7" Padding="24">
                     <ContentControl x:Name="MainContentArea" HorizontalContentAlignment="Stretch">
                         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="16" MaxWidth="500">
-                            <TextBlock Text="Üdvözöljük az EvolKréta Önfejlesztő Iskolarendszerben!"
+                            <TextBlock Text="Welcome to the EvolKréta Self-Evolving School System!"
                                        FontSize="18" FontWeight="Bold" Foreground="#2C3E50" TextAlignment="Center" />
                             <TextBlock
-                                Text="Ez az alkalmazás képes önmagát fejleszteni az AI segítségével. Kérj tetszőleges funkciót az alsó sávban, és az beépül a kódba!"
+                                Text="This application can evolve itself using AI. Request any feature in the bottom bar, and it will be integrated into the code!"
                                 Foreground="#7F8C8D" FontSize="13" TextAlignment="Center" TextWrapping="Wrap" />
                             <TextBlock
-                                Text="Például: 'Szeretnék egy átlagkiszámoló fület grafikonnal diákoknak' vagy 'Szeretnék egy új órát felvevő űrlapot tanároknak' vagy 'Szeretnék egy igazgatói diákáthelyező felületet'."
+                                Text="For example: 'I want a grade average calculator tab with a chart for students' or 'I want a new lesson creation form for teachers' or 'I want a director student transfer view'."
                                 Foreground="#95A5A6" FontSize="11" TextAlignment="Center" FontStyle="Italic"
                                 TextWrapping="Wrap" />
                         </StackPanel>
@@ -71,9 +71,9 @@
                         Background="#D0FFFFFF" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="15" Width="260">
                         <ProgressBar IsIndeterminate="True" Height="6" CornerRadius="3" />
-                        <TextBlock Text="Az AI éppen kódot ír..." HorizontalAlignment="Center"
+                        <TextBlock Text="AI is writing code..." HorizontalAlignment="Center"
                                    Foreground="#2C3E50" FontSize="14" FontWeight="SemiBold" />
-                        <TextBlock Text="Ez eltarthat pár másodpercig..." HorizontalAlignment="Center"
+                        <TextBlock Text="This might take a few seconds..." HorizontalAlignment="Center"
                                    Foreground="#7F8C8D" FontSize="11" />
                     </StackPanel>
                 </Border>
@@ -83,7 +83,7 @@
                 <Grid ColumnDefinitions="*, Auto">
                     <TextBlock x:Name="SelectedViewText" Grid.Column="0" FontSize="12" Foreground="#2C3E50"
                                VerticalAlignment="Center" TextWrapping="Wrap" />
-                    <Button x:Name="ClearSelectionButton" Grid.Column="1" Content="Új funkció (kijelölés törlése)"
+                    <Button x:Name="ClearSelectionButton" Grid.Column="1" Content="New feature (clear selection)"
                             FontSize="11" Padding="10,4" Background="Transparent" Foreground="#3498DB"
                             BorderBrush="#3498DB" BorderThickness="1" CornerRadius="6" Margin="12,0,0,0" />
                 </Grid>
@@ -95,21 +95,21 @@
 
                     <Border Grid.Column="0" Background="#F0F2F4" CornerRadius="8" Margin="0,0,8,0">
                         <TextBox x:Name="PromptInput" BorderThickness="0" Background="Transparent"
-                                 PlaceholderText="Írja be az elvárt új funkciót vagy modult..."
+                                 PlaceholderText="Type the requested new feature or module..."
                                  Height="42" VerticalContentAlignment="Center" Padding="12,0" />
                     </Border>
 
-                    <Button x:Name="AiButton" Grid.Column="1" Content="Önfejlesztés"
+                    <Button x:Name="AiButton" Grid.Column="1" Content="Evolve"
                             Padding="16,0" Height="42" VerticalContentAlignment="Center"
                             Background="#3498DB" Foreground="White" CornerRadius="8" FontWeight="SemiBold"
                             Margin="0,0,6,0" />
 
-                    <Button x:Name="ApproveButton" Grid.Column="2" Content="Mentés a Lemezre"
+                    <Button x:Name="ApproveButton" Grid.Column="2" Content="Save to Disk"
                             Height="42" VerticalContentAlignment="Center"
                             Background="#2ECC71" Foreground="White" CornerRadius="8" FontWeight="SemiBold"
                             IsVisible="False" Margin="0,0,6,0" />
 
-                    <Button x:Name="DiscardButton" Grid.Column="3" Content="Elvetés"
+                    <Button x:Name="DiscardButton" Grid.Column="3" Content="Discard"
                             Height="42" VerticalContentAlignment="Center"
                             Background="#E74C3C" Foreground="White" CornerRadius="8" FontWeight="SemiBold"
                             IsVisible="False" />

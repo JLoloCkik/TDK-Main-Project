@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 namespace Kreta.Services.Git;
 
 /// <summary>
-/// A Git parancsok automatikus futtatásáért és a GitHub 'ai-dev' ágára történő push-olásért felelős szolgáltatás.
+/// Service responsible for automatically executing Git commands and pushing to the 'ai-dev' GitHub branch.
 /// </summary>
 public class GitService : IGitService
 {
@@ -18,7 +18,7 @@ public class GitService : IGitService
     }
 
     /// <summary>
-    /// Hozzáadja a módosított vagy új C# fájlt, commitolja és feltölti a GitHub 'ai-dev' ágra.
+    /// Adds the modified or new C# file, commits it, and pushes it to the GitHub 'ai-dev' branch.
     /// </summary>
     public async Task<bool> CommitAndPushAsync(string filePath, string commitMessage, string branchName = "ai-dev")
     {
@@ -64,9 +64,9 @@ public class GitService : IGitService
 
             Console.WriteLine($"[Git] Változtatások feltöltése a távoli tárhelyre (origin {branchName})...");
 
-            // Force push: az 'ai-dev' ágat teljes mértékben ez a rendszer kezeli
-            // (az EvolViews mappa a forrás igazsága), ezért nem próbálunk mergelni/rebase-elni
-            // egy esetlegesen eltérő remote állapottal — egyszerűen felülírjuk.
+            // Force push: the 'ai-dev' branch is fully managed by this system
+            // (the EvolViews directory is the source of truth), so we don't try to merge/rebase
+            // with a potentially differing remote state — we simply overwrite it.
             var pushResult = await RunGitCommandAsync($"push --force -u origin {branchName}");
 
             if (!pushResult.Success)
@@ -86,7 +86,7 @@ public class GitService : IGitService
     }
 
     /// <summary>
-    /// Eltávolítja a törölt C# fájlt a Git tárhelyből és elküldi a törlési commitot a remote ágra.
+    /// Removes the deleted C# file from the Git repository and pushes the deletion commit to the remote branch.
     /// </summary>
     public async Task<bool> RemoveAndPushAsync(string filePath, string commitMessage, string branchName = "ai-dev")
     {

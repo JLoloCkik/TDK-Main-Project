@@ -30,9 +30,9 @@ public partial class MainWindow : Window
     private Role _currentRole = Role.Student;
 
     /// <summary>
-    /// A felhasználó által az oldalsávban éppen kijelölt/megnyitott nézet, és annak fájlútja.
-    /// Amíg be van állítva, a következő AI-kérés KÖZVETLENÜL ezt a nézetet módosítja/javítja
-    /// ahelyett, hogy a rendszernek ki kellene találnia a szabad szövegből, melyikről van szó.
+    /// The view currently selected/opened by the user in the sidebar, and its file path.
+    /// While set, the next AI request will DIRECTLY modify/fix this view
+    /// instead of the system having to guess which one it is from free text.
     /// </summary>
     private IEvolView? _selectedView;
     private string? _selectedViewFilePath;
@@ -58,7 +58,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Rendszerindításkor betölti és lefordítja a lemezen található C# nézeteket anélkül, hogy törölné őket.
+    /// On system startup, loads and compiles the C# views found on the disk without deleting them.
     /// </summary>
     private void BootAndCompileSavedModules()
     {
@@ -67,8 +67,8 @@ public partial class MainWindow : Window
             var files = Directory.GetFiles(_evolViewsDirectory, "*.cs");
             if (files.Length == 0) return;
 
-            EvolverStatusText.Text = "🟢 Evolúciós Motor: Betöltés...";
-            StatusText.Text = $"{files.Length} korábbi modul betöltése a lemezről...";
+            EvolverStatusText.Text = "🟢 Evolution Engine: Loading...";
+            StatusText.Text = $"Loading {files.Length} saved modules from disk...";
             StatusText.Foreground = Brushes.Orange;
 
             _loadedViews.Clear();
@@ -100,25 +100,25 @@ public partial class MainWindow : Window
                 }
                 else
                 {
-                    Console.WriteLine($"[Betöltési hiba - {viewName}]: {loadResult?.ErrorMessage}");
+                    Console.WriteLine($"[Loading error - {viewName}]: {loadResult?.ErrorMessage}");
                 }
             }
 
-            EvolverStatusText.Text = "🟢 Evolúciós Motor: Aktív";
-            StatusText.Text = $"{loadedCount} modul sikeresen betöltve a lemezről.";
+            EvolverStatusText.Text = "🟢 Evolution Engine: Active";
+            StatusText.Text = $"{loadedCount} modules successfully loaded from disk.";
             StatusText.Foreground = Brushes.Green;
 
             RefreshSidebarMenu();
         }
         catch (Exception ex)
         {
-            StatusText.Text = $"Rendszerindítási hiba: {ex.Message}";
+            StatusText.Text = $"Startup error: {ex.Message}";
             StatusText.Foreground = Brushes.Red;
         }
     }
 
     /// <summary>
-    /// Példányosítja a lefordított C# osztályt a megfelelő adatbázis-kontextussal (Student, Teacher, Director).
+    /// Instantiates the compiled C# class with the appropriate database context (Student, Teacher, Director).
     /// </summary>
     private IEvolView? InstantiateViewForRole(Type type)
     {
@@ -159,14 +159,14 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[Példányosítási Hiba - {type.Name}]: {ex.Message}");
+            Console.WriteLine($"[Instantiation Error - {type.Name}]: {ex.Message}");
         }
 
         return null;
     }
 
     /// <summary>
-    /// Szigorúan ellenőrzi, hogy a megadott nézet megjelenhet-e az aktuális szerepkör menüjében.
+    /// Strictly checks if the given view is allowed to appear in the menu of the current role.
     /// </summary>
     private bool IsViewAllowedForRole(IEvolView view, Role role)
     {
@@ -177,21 +177,21 @@ public partial class MainWindow : Window
         {
             foreach (var param in ctor.GetParameters())
             {
-                // A diák kontextusú nézet csak diáknak jelenhet meg
+                // Student context view can only be displayed to students
                 if (param.ParameterType == typeof(IStudentContext) && role != Role.Student)
                     return false;
 
-                // A tanár kontextusú nézet csak tanárnak jelenhet meg
+                // Teacher context view can only be displayed to teachers
                 if (param.ParameterType == typeof(ITeacherContext) && role != Role.Teacher)
                     return false;
 
-                // Az igazgató kontextusú nézet csak igazgatónak jelenhet meg
+                // Director context view can only be displayed to directors
                 if (param.ParameterType == typeof(IDirectorContext) && role != Role.Director)
                     return false;
             }
         }
 
-        // Névtér alapján történő szigorú szűrés (pl. Kreta.Evol.Student)
+        // Strict filtering based on namespace (e.g. Kreta.Evol.Student)
         if (type.Namespace != null)
         {
             if (type.Namespace.Contains("Student") && role != Role.Student)
@@ -240,26 +240,26 @@ public partial class MainWindow : Window
                 var freshInstance = InstantiateViewForRole(view.GetType()) ?? view;
                 MainContentArea.Content = freshInstance.CreateView();
 
-                // A frissen példányosított nézetet jelöljük ki, és a hozzá tartozó fájlútvonalat
-                // rögzítjük - innentől a következő AI-kérés KÖZVETLENÜL ezt a nézetet fogja módosítani.
+                // Select the freshly instantiated view and record its file path
+                // - from now on, the next AI request will DIRECTLY modify this view.
                 _viewFilePathMap.TryGetValue(view, out var filePath);
                 SelectView(freshInstance, filePath, view.Name);
 
-                StatusText.Text = $"Nézet betöltve: {view.Name}";
+                StatusText.Text = $"View loaded: {view.Name}";
                 StatusText.Foreground = Brushes.LightGreen;
             }
             catch (Exception ex)
             {
-                StatusText.Text = $"Hiba a nézet megnyitásakor: {ex.Message}";
+                StatusText.Text = $"Error opening view: {ex.Message}";
                 StatusText.Foreground = Brushes.Red;
-                Console.WriteLine($"[Nézet megnyitási hiba]: {ex}");
+                Console.WriteLine($"[View opening error]: {ex}");
             }
         }
     }
 
     /// <summary>
-    /// Kijelöl egy nézetet: eltárolja a fájlútját, és megjeleníti a kijelölés-sávot, hogy a felhasználó
-    /// lássa, a következő AI-kérés közvetlenül ezt fogja módosítani.
+    /// Selects a view: stores its file path and displays the selection banner so the user
+    /// can see that the next AI request will directly modify this.
     /// </summary>
     private void SelectView(IEvolView view, string? filePath, string displayName)
     {
@@ -268,18 +268,18 @@ public partial class MainWindow : Window
 
         if (string.IsNullOrWhiteSpace(filePath))
         {
-            // Nincs ismert fájlútvonal (pl. beépített, nem AI-generált nézet) - nem tudjuk közvetlenül
-            // szerkeszteni, ezért nem jelenítjük meg kijelöltként.
+            // No known file path (e.g. built-in non-AI view) - cannot edit directly,
+            // so we do not display as selected.
             SelectedViewBanner.IsVisible = false;
             return;
         }
 
         SelectedViewBanner.IsVisible = true;
-        SelectedViewText.Text = $"Kijelölve: „{displayName}” — a következő kérésed közvetlenül EZT a nézetet fogja módosítani/javítani.";
+        SelectedViewText.Text = $"Selected: '{displayName}' — your next request will directly modify/repair THIS view.";
     }
 
     /// <summary>
-    /// Törli a kijelölést: a következő AI-kérés újra vadonatúj funkcióként lesz kezelve.
+    /// Clears the selection: the next AI request will be treated as a brand new feature again.
     /// </summary>
     private void ClearSelection()
     {
@@ -291,7 +291,7 @@ public partial class MainWindow : Window
     private void OnClearSelectionClick(object? sender, RoutedEventArgs e)
     {
         ClearSelection();
-        StatusText.Text = "Kijelölés törölve. A következő kérés új funkciót fog létrehozni.";
+        StatusText.Text = "Selection cleared. The next request will create a new feature.";
         StatusText.Foreground = Brushes.LightBlue;
     }
 
@@ -304,7 +304,7 @@ public partial class MainWindow : Window
             ClearSelection();
             MainContentArea.Content = null;
             RefreshSidebarMenu();
-            StatusText.Text = $"Szerepkör átváltva: {selectedItem.Content}";
+            StatusText.Text = $"Role switched to: {selectedItem.Content}";
             StatusText.Foreground = Brushes.LightBlue;
         }
     }
@@ -314,15 +314,15 @@ public partial class MainWindow : Window
         var prompt = PromptInput.Text?.Trim();
         if (string.IsNullOrWhiteSpace(prompt))
         {
-            StatusText.Text = "Kérjük, írja be a kívánt funkció leírását!";
+            StatusText.Text = "Please enter the description of the requested feature!";
             StatusText.Foreground = Brushes.Orange;
             return;
         }
 
         SetBusy(true);
         StatusText.Text = string.IsNullOrWhiteSpace(_selectedViewFilePath)
-            ? "AI kódgenerálás folyamatban..."
-            : $"AI módosítás folyamatban a kijelölt nézeten ({_selectedView?.Name})...";
+            ? "AI code generation in progress..."
+            : $"AI modification in progress on selected view ({_selectedView?.Name})...";
         StatusText.Foreground = Brushes.Cyan;
 
         try
@@ -332,7 +332,7 @@ public partial class MainWindow : Window
 
             if (result.IsRejectedAction)
             {
-                StatusText.Text = $"❌ Hozzáférés megtagadva: {result.Description}";
+                StatusText.Text = $"❌ Access denied: {result.Description}";
                 StatusText.Foreground = Brushes.Red;
                 MainContentArea.Content = null;
                 ApproveButton.IsVisible = false;
@@ -342,14 +342,14 @@ public partial class MainWindow : Window
 
             if (result.IsDeletedAction)
             {
-                StatusText.Text = $"🗑️ Modul törölve: {result.ViewName}";
+                StatusText.Text = $"🗑️ Module deleted: {result.ViewName}";
                 StatusText.Foreground = Brushes.Yellow;
                 MainContentArea.Content = null;
 
                 _loadedViews.RemoveAll(v => v.Name.Contains(result.ViewName ?? "", StringComparison.OrdinalIgnoreCase));
                 RefreshSidebarMenu();
 
-                // Ha a törölt nézet volt kijelölve, a kijelölés már érvénytelen - töröljük.
+                // If the deleted view was selected, selection is no longer valid - clear it.
                 ClearSelection();
 
                 ApproveButton.IsVisible = false;
@@ -360,7 +360,7 @@ public partial class MainWindow : Window
             if (result.IsSuccess && result.LoadedControl != null)
             {
                 MainContentArea.Content = result.LoadedControl;
-                StatusText.Text = $"Új funkció elkészült: '{result.ViewName}'. Mentheti vagy elvetheti.";
+                StatusText.Text = $"New feature created: '{result.ViewName}'. You can save or discard it.";
                 StatusText.Foreground = Brushes.Green;
 
                 if (result.CompiledAssembly != null)
@@ -378,9 +378,9 @@ public partial class MainWindow : Window
                             _viewFilePathMap[instance] = result.FilePath;
                             RefreshSidebarMenu();
 
-                            // A kijelölést a FRISSEN generált/módosított nézetre frissítjük, hogy a
-                            // következő prompt (pl. "javítsd ki még ezt is") ugyanazt a fájlt módosítsa
-                            // tovább - így iteratívan lehet finomítani/repair-elni egy funkciót.
+                            // Update selection to the FRESHLY generated/modified view so the
+                            // next prompt modifies the same file again for iterative refining/repairing.
+                            // further - allowing iterative refinement/repairing of a feature.
                             SelectView(instance, result.FilePath, result.ViewName ?? instance.Name);
                         }
                     }
@@ -392,7 +392,7 @@ public partial class MainWindow : Window
             }
             else
             {
-                StatusText.Text = $"Hiba történt: {result.ErrorMessage}";
+                StatusText.Text = $"Error occurred: {result.ErrorMessage}";
                 StatusText.Foreground = Brushes.Red;
                 ApproveButton.IsVisible = false;
                 DiscardButton.IsVisible = false;
@@ -400,7 +400,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            StatusText.Text = $"Váratlan hiba: {ex.Message}";
+            StatusText.Text = $"Unexpected error: {ex.Message}";
             StatusText.Foreground = Brushes.Red;
         }
         finally
@@ -418,26 +418,26 @@ public partial class MainWindow : Window
     {
         if (_lastEvolveResult == null || string.IsNullOrWhiteSpace(_lastEvolveResult.FilePath))
         {
-            StatusText.Text = "Nincs mit jóváhagyni.";
+            StatusText.Text = "Nothing to approve.";
             return;
         }
 
-        StatusText.Text = "Funkció jóváhagyása és feltöltése (Git Push)...";
+        StatusText.Text = "Approving feature and uploading (Git Push)...";
         StatusText.Foreground = Brushes.Orange;
 
         bool pushSuccess = await _evolutionService.AcceptAndPushFeatureAsync(
             _lastEvolveResult.FilePath,
-            _lastEvolveResult.ViewName ?? "Új Nézet"
+            _lastEvolveResult.ViewName ?? "New View"
         );
 
         if (pushSuccess)
         {
-            StatusText.Text = "Sikeresen elmentve a lemezre és feltöltve a GitHub-ra!";
+            StatusText.Text = "Successfully saved to disk and pushed to GitHub!";
             StatusText.Foreground = Brushes.Green;
         }
         else
         {
-            StatusText.Text = "A fájl elmentve a lemezre, de a Git Push sikertelen volt.";
+            StatusText.Text = "File saved to disk, but Git Push failed.";
             StatusText.Foreground = Brushes.Yellow;
         }
 
@@ -449,18 +449,18 @@ public partial class MainWindow : Window
     {
         if (_lastEvolveResult == null || string.IsNullOrWhiteSpace(_lastEvolveResult.FilePath))
         {
-            StatusText.Text = "Nincs mit elvetni.";
+            StatusText.Text = "Nothing to discard.";
             return;
         }
 
         bool deleted = await _evolutionService.DiscardFeatureAsync(_lastEvolveResult.FilePath);
         if (deleted)
         {
-            StatusText.Text = "Funkció elvetve és törölve a lemezről.";
+            StatusText.Text = "Feature discarded and deleted from disk.";
             StatusText.Foreground = Brushes.Yellow;
             MainContentArea.Content = null;
 
-            // Ha az elvetett fájl volt a kijelölt nézet, a kijelölés már érvénytelen - töröljük.
+            // If the discarded file was selected, selection is no longer valid - clear it.
             if (string.Equals(_selectedViewFilePath, _lastEvolveResult.FilePath, StringComparison.OrdinalIgnoreCase))
             {
                 ClearSelection();
@@ -486,20 +486,20 @@ public partial class MainWindow : Window
     {
         var runner = new AutomatedTestRunner(_evolutionService, new AstAnalyzer(), new PromptConformanceVerifier());
 
-        // 1. Lefuttatja az 100 tesztet
+        // 1. Runs the 100 tests
         var results = await runner.RunAllTestsAsync(
             delayBetweenTestsMs: 1000, 
             progressCallback: (current, total, result) => {
-                Console.WriteLine($"[Haladás: {current}/{total}] {result.Prompt} -> {(result.IsSuccess ? "OK" : "HIBA")}");
+                Console.WriteLine($"[Progress: {current}/{total}] {result.Prompt} -> {(result.IsSuccess ? "OK" : "ERROR")}");
             }
         );
 
-        // 2. Legenerálja a frissített Markdown riportot
+        // 2. Generates the updated Markdown report
         string markdownReport = runner.ExportToMarkdownReport(results);
 
-        // 3. Elmenti a lemezre közvetlenül a Canvas-ban lévő Markdown fájl helyére
+        // 3. Saves to disk directly over the Markdown file location
         File.WriteAllText("teszt_adatkeszlet_100.md", markdownReport);
-        Console.WriteLine("🟢 A mérési adatok frissítve a 'teszt_adatkeszlet_100.md' fájlban!");
+        Console.WriteLine("🟢 Measurement data updated in 'teszt_adatkeszlet_100.md' file!");
     }
     
 

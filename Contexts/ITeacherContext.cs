@@ -12,8 +12,8 @@ public interface ITeacherContext
     List<Lesson> GetLessons();
     void AddLesson(Lesson lesson);
 
-    // === ALTALANOS ENTITAS-TAROLO (uj funkciokhoz, pl. hirdetotabla, esemenyek) ===
-    // Tanar szerepkorben OLVASAS es IRAS is engedelyezett.
+    // === GENERAL ENTITY STORE (for new features, e.g. notice board, events) ===
+    // In Teacher role, READ and WRITE are allowed.
     List<GenericRecord> QueryEntities(string entityType);
     GenericRecord? GetEntity(string entityType, int id);
     int SaveEntity(string entityType, Dictionary<string, string> data, int? id = null);

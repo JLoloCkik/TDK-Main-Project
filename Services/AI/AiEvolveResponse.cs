@@ -1,37 +1,37 @@
 namespace Kreta.Services.AI;
 
 /// <summary>
-/// Az AI által generált válasz deszerializációs modellje.
+/// Deserialization model of the AI-generated response.
 /// </summary>
 public class AiEvolveResponse
 {
     /// <summary>
-    /// A generált vagy módosított nézet C# osztályneve / azonosítója.
+    /// The C# class name / identifier of the generated or modified view.
     /// </summary>
     public string? ViewName { get; set; }
 
     /// <summary>
-    /// A funkció rövid magyar nyelvű leírása.
+    /// A short description of the feature in Hungarian.
     /// </summary>
     public string? Description { get; set; }
 
     /// <summary>
-    /// A generált Avalonia/C# forráskód.
+    /// The generated Avalonia/C# source code.
     /// </summary>
     public string? SourceCode { get; set; }
 
     /// <summary>
-    /// Opcionális tesztkód vagy kiegészítő szkript.
+    /// Optional test code or additional script.
     /// </summary>
     public string? TestCode { get; set; }
 
     /// <summary>
-    /// Az AI által kért akció (pl. "CREATE", "UPDATE", "DELETE", "REJECT").
+    /// The action requested by the AI (e.g. "CREATE", "UPDATE", "DELETE", "REJECT").
     /// </summary>
     public string? Action { get; set; }
 
     /// <summary>
-    /// Opcionális eseménykezelő metódus megnevezés.
+    /// Optional event handler method name.
     /// </summary>
     public string? HandlerMethod { get; set; }
 }
