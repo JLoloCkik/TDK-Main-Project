@@ -9,8 +9,8 @@ public interface IStudentContext
     User? GetMyProfile();
     List<Lesson> GetMyLessons();
 
-    // === ALTALANOS ENTITAS-TAROLO (uj funkciokhoz, pl. hirdetotabla, esemenyek) ===
-    // Diak szerepkorben CSAK OLVASAS engedelyezett - iras (SaveEntity/DeleteEntity) NEM elerheto.
+    // === GENERAL ENTITY STORE (for new features, e.g. notice board, events) ===
+    // In Student role, ONLY READ is allowed - write (SaveEntity/DeleteEntity) is NOT available.
     List<GenericRecord> QueryEntities(string entityType);
     GenericRecord? GetEntity(string entityType, int id);
 }

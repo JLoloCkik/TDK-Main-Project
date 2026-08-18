@@ -110,7 +110,7 @@ public class FaliujsagView : IEvolView
                 {
                     return expirationDate.Date >= DateTime.Now.Date;
                 }
-                return true; // Ha nincs dátum, sosem jár le
+                return true; // If no date set, it never expires
             }).OrderByDescending(n => n.CreatedAt).ToList();
 
             _noticesListBox.ItemsSource = _activeNotices.Select(n => n.Data.GetValueOrDefault("Title", "Nincs cím")).ToList();

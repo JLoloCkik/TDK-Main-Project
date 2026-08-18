@@ -132,9 +132,9 @@ public class EszkozIgenyloView : IEvolView
         try
         {
             var allRequests = _context.QueryEntities(EntityType);
-            // Mivel a kontextus nem adja vissza a jelenlegi felhasználót,
-            // a biztonság kedvéért az összes igénylést megjelenítjük.
-            // Egy fejlettebb rendszerben itt a tanár saját ID-jára szűrnénk.
+            // Since context does not return the current user,
+            // we display all requests to be safe.
+            // In a more advanced system, we would filter by the teacher's own ID here.
             _myRequestsListBox.ItemsSource = allRequests
                 .OrderByDescending(r => r.CreatedAt)
                 .Select(r => $"{r.CreatedAt:yyyy-MM-dd} - {r.Data["EquipmentName"]} ({r.Data["Quantity"]} db) - Állapot: {r.Data["Status"]}")

@@ -10,8 +10,8 @@ using Kreta.Core;
 namespace Kreta.Services.AI;
 
 /// <summary>
-/// Gemini API kapcsolatot, Formális Prompt Refiner elő-szűrést, Prompt-to-Code Conformance ellenőrzést,
-/// meglévő nézetek kontextus-elemzését és C# UI kódgenerálást végző szolgáltatás.
+/// Service performing Gemini API connection, Formal Prompt Refiner pre-filtering, Prompt-to-Code Conformance verification,
+/// context analysis of existing views, and C# UI code generation.
 /// </summary>
 public class AiService : IAiService
 {
@@ -34,7 +34,7 @@ public class AiService : IAiService
         }
         catch
         {
-            // Csendben figyelmen kívül hagyjuk, ha nincs .env fájl
+            // Silently ignore if no .env file
         }
     }
 
@@ -52,7 +52,7 @@ public class AiService : IAiService
             }
             catch
             {
-                // DotNetEnv nincs konfigurálva
+                // DotNetEnv not configured
             }
         }
 
@@ -76,10 +76,10 @@ public class AiService : IAiService
                 "export GEMINI_API_KEY=\"a_te_kulcsod_itt\" && dotnet run");
         }
 
-        // 1. LÉPÉS: Formális Prompt Refiner előfeldolgozás
+        // STEP 1: Formal Prompt Refiner preprocessing
         var formalSpec = await _promptRefiner.RefinePromptAsync(prompt, role, apiKey);
 
-        // 2. LÉPÉS: Korai RBAC elutasítás ellenőrzése
+        // STEP 2: Check for early RBAC rejection
         if (formalSpec.IsRoleViolating)
         {
             Console.WriteLine($"[RBAC Guardrail] Elutasítva: {formalSpec.ViolationReason}");
@@ -144,7 +144,7 @@ public class AiService : IAiService
 
                     Console.WriteLine($"[AI Kapcsolat] SIKERES! Használt végpont: {attempt.Version}/{attempt.Model}");
 
-                    // 🟢 3. LÉPÉS: Prompt-to-Code Conformance Verification (AST alapon)
+                    // STEP 3: Prompt-to-Code Conformance Verification (AST-based)
                     if (!string.IsNullOrEmpty(response.SourceCode) && response.Action != "DELETE" &&
                         response.Action != "REJECT")
                     {
@@ -227,12 +227,12 @@ public class AiService : IAiService
     }
 
     /// <summary>
-    /// Ha a felhasználó a felületen KIJELÖLT egy már létező, korábban generált nézetet (pl. rákattintott
-    /// az oldalsávban a ""Jegy Kalkulátor""-ra), és utána kér módosítást, ezt a metódust hívjuk meg,
-    /// hogy a TELJES (nem csonkolt) forráskódját beemeljük a system promptba, egyértelmű MODIFY
-    /// utasítással. Ez kiváltja azt a korábbi, megbízhatatlan viselkedést, hogy a modellnek a
-    /// GetExistingViewsContext() által felsorolt, csonkolt kódú nézetek közül kellett volna KITALÁLNIA
-    /// (név alapján, szabad szövegből), melyiket akarja a felhasználó módosítani.
+    /// If the user SELECTED an already existing, previously generated view on the UI (e.g. clicked
+    /// on "Grade Calculator" in the sidebar), and then asks for a modification, this method is called
+    /// to inject its ENTIRE (untruncated) source code into the system prompt, with a clear MODIFY
+    /// instruction. This replaces the previous, unreliable behavior where the model had to GUESS
+    /// (based on name, from free text) which of the truncated code views listed by
+    /// GetExistingViewsContext() the user wanted to modify.
     /// </summary>
     private string GetTargetViewContext(string? targetViewFilePath)
     {
@@ -412,9 +412,9 @@ Ez alapján generálj EGY EGYSZERŰBB, RÖVIDEBB C# kódot, ami ezt kiküszöbli
             generationConfig = new
             {
                 responseMimeType = "application/json",
-                // 🟢 JAVÍTÁS: 8192 túl kevés volt - a gemini-2.5-pro "gondolkodási" (thinking) tokenjei
-                // önmagukban felemésztették a teljes kvótát, ezért a válasz csonkán (MAX_TOKENS) szakadt meg,
-                // mielőtt a tényleges JSON/C# kód elkezdődött volna. Nagyobb kerettel ez elkerülhető.
+                // FIX: 8192 was too low - gemini-2.5-pro "thinking" tokens
+                // consumed the full quota alone, so the response was truncated (MAX_TOKENS)
+                // before the actual JSON/C# code started. A higher limit prevents this.
                 maxOutputTokens = 32768,
                 responseSchema = new
                 {
@@ -462,10 +462,9 @@ Ez alapján generálj EGY EGYSZERŰBB, RÖVIDEBB C# kódot, ami ezt kiküszöbli
 
             string? finishReason = candidate.TryGetProperty("finishReason", out var fr) ? fr.GetString() : null;
 
-            // 🟢 JAVÍTÁS: A "content" objektumnak MAX_TOKENS esetén (amikor a válasz a "gondolkodási"
-            // fázisban szakad meg) egyáltalán nincs "parts" mezője - a korábbi kód ezen a ponton egy
-            // kevéssé informatív, nyers KeyNotFoundException-t dobott. TryGetProperty-vel biztonságosan
-            // kezeljük, és egyenesen az alábbi, egyértelmű MAX_TOKENS hibaágba futunk.
+            // FIX: For MAX_TOKENS (when response cuts off during thinking phase),
+            // the "content" object has no "parts" field - using TryGetProperty safely handles this
+            // to proceed directly to the clear MAX_TOKENS error block below.
             string? responseText = null;
             if (candidate.TryGetProperty("content", out var contentEl) &&
                 contentEl.TryGetProperty("parts", out var partsElement) &&
@@ -480,9 +479,9 @@ Ez alapján generálj EGY EGYSZERŰBB, RÖVIDEBB C# kódot, ami ezt kiküszöbli
             {
                 if (finishReason == "MAX_TOKENS")
                 {
-                    // A "MAX_TOKENS" szót SZÁNDÉKOSAN tartalmazza az üzenet: a hívó GenerateFeatureAsync
-                    // újrapróbálkozási logikája erre a pontos szövegre keres, hogy tudja, érdemes-e
-                    // (rövidebb kódot kérve) újra próbálkozni ahelyett, hogy azonnal feladná.
+                    // Message INTENTIONALLY contains "MAX_TOKENS" so caller's GenerateFeatureAsync
+                    // retry logic knows whether to attempt a retry (requesting shorter code)
+                    // instead of giving up immediately.
                     throw new Exception(
                         "A modell válasza megszakadt, mielőtt befejezte volna a kódot (finishReason: MAX_TOKENS). " +
                         "Kérj egy egyszerűbb / kisebb funkciót, vagy próbáld újra.");

@@ -1,4 +1,4 @@
-﻿using Avalonia;
+using Avalonia;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -18,7 +18,7 @@ class Program
         // dotnet run -- --benchmark
         if (args.Contains("--benchmark"))
         {
-            Console.WriteLine("🚀 Automatizált mérési munkamenet indítása CLI módban...");
+            Console.WriteLine("🚀 Starting automated benchmark session in CLI mode...");
 
             try
             {
@@ -37,22 +37,22 @@ class Program
                     perTestTimeoutMs: 60000,
                     progressCallback: (current, total, result) =>
                     {
-                        string status = result.IsSuccess ? "🟢 OK" : "🔴 HIBA";
+                        string status = result.IsSuccess ? "🟢 OK" : "🔴 ERROR";
                         Console.WriteLine($"[{current}/{total}] {result.Prompt} -> {status}");
                     }
                 );
 
-                Console.WriteLine("🟢 A mérés befejeződött, a kimeneti fájlok frissültek!");
+                Console.WriteLine("🟢 Benchmark completed, output files updated!");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ Hiba a tesztfuttatás során: {ex.Message}");
+                Console.WriteLine($"❌ Error during test run: {ex.Message}");
             }
 
-            return; // Kilépés, nem indítjuk el a GUI-t
+            return; // Exit, do not start the GUI
         }
 
-        // Normál Avalonia GUI indítás
+        // Normal Avalonia GUI start
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }
 

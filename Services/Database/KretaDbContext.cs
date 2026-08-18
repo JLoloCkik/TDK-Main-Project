@@ -16,23 +16,23 @@ public class KretaDbContext : DbContext
     public DbSet<Lesson> Lessons => Set<Lesson>();
 
     /// <summary>
-    /// Altalanos, tetszoleges uj funkciohoz hasznalhato entitasok tablaja.
-    /// Ide kerul MINDEN olyan uj adat, amit a Gemini a fix domain-osztalyokon (Grade, Lesson,
-    /// Subject, User) kivul, sajat maga valasztott EntityType cimkevel akar tarolni
-    /// (pl. hirdetotabla / "NoticeMessage", esemenyek, szavazasok, stb.).
+    /// Table for entities usable for general, arbitrary new features.
+    /// ALL new data that Gemini wants to store outside the fixed domain classes (Grade, Lesson,
+    /// Subject, User), with a self-chosen EntityType label, goes here
+    /// (e.g. notice board / "NoticeMessage", events, votes, etc.).
     /// </summary>
     public DbSet<GenericRecord> GenericRecords => Set<GenericRecord>();
 
     public KretaDbContext()
     {
-        // 🟢 JAVÍTÁS: Biztosítjuk, hogy az SQLite fájl és a táblák séma szerint mindig létrejöjjenek
+        // Ensure that the SQLite file and tables are created according to schema
         Database.EnsureCreated();
         EnsureGenericRecordsTableExists();
     }
 
     /// <summary>
-    /// Tesztelhetőségi konstruktor: lehetővé teszi, hogy tesztek saját (pl. ideiglenes fájl vagy
-    /// in-memory) SQLite kapcsolatot injektáljanak ahelyett, hogy a valódi evol_kreta.db-t használnák.
+    /// Testability constructor: allows tests to inject their own (e.g. temporary file or
+    /// in-memory) SQLite connection instead of using the real evol_kreta.db.
     /// </summary>
     public KretaDbContext(DbContextOptions<KretaDbContext> options) : base(options)
     {
@@ -49,12 +49,13 @@ public class KretaDbContext : DbContext
     }
 
     /// <summary>
-    /// A Database.EnsureCreated() CSAK akkor hozza letre a teljes semat, ha az adatbazis-fajl
-    /// MEG NEM LETEZETT. Mivel a GenericRecords tabla bevezetese elott mar sok evol_kreta.db
-    /// fajl letezett (User/Grade/Lesson/Subject tablakkal), azokba EnsureCreated() utolag NEM
-    /// szurja be az uj tablat. Ez a metodus IF NOT EXISTS-szel, fajltol fuggetlenul biztositja,
-    /// hogy a GenericRecords tabla mindig letezzen - regi es uj adatbazis-fajlon egyarant,
-    /// adatvesztes (evol_kreta.db torlese) nelkul.
+    /// Database.EnsureCreated() ONLY creates the full schema if the database file
+    /// DID NOT EXIST YET. Since many evol_kreta.db files already existed before the
+    /// introduction of the GenericRecords table (with User/Grade/Lesson/Subject tables),
+    /// EnsureCreated() DOES NOT insert the new table into them retrospectively.
+    /// This method uses IF NOT EXISTS to ensure, independently of the file,
+    /// that the GenericRecords table always exists - on both old and new database files alike,
+    /// without data loss (without deleting evol_kreta.db).
     /// </summary>
     private void EnsureGenericRecordsTableExists()
     {

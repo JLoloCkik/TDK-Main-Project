@@ -11,8 +11,8 @@ public interface IDirectorContext
     List<string> GetAllClasses();
     void AssignClassToStudent(int studentId, string className);
 
-    // === ALTALANOS ENTITAS-TAROLO (uj funkciokhoz, pl. hirdetotabla, esemenyek) ===
-    // Igazgato szerepkorben OLVASAS es IRAS is engedelyezett.
+    // === GENERAL ENTITY STORE (for new features, e.g. notice board, events) ===
+    // In Director role, READ and WRITE are allowed.
     List<GenericRecord> QueryEntities(string entityType);
     GenericRecord? GetEntity(string entityType, int id);
     int SaveEntity(string entityType, Dictionary<string, string> data, int? id = null);

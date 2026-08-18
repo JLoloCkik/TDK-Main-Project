@@ -4,7 +4,7 @@ using Avalonia.Controls;
 namespace Kreta.Services.Evolution;
 
 /// <summary>
-/// Az evolúciós kódgenerálás, módosítás, törlés és betöltés eredményét tároló modell.
+/// Model storing the result of evolutionary code generation, modification, deletion, and loading.
 /// </summary>
 public class EvolveResult
 {

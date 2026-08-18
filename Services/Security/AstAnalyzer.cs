@@ -9,7 +9,7 @@ namespace Kreta.Services.Security;
 
 public class AstAnalyzer
 {
-    // CSAK EZEK A NÉVTÉROK ÉS TÍPUSOK HASZNÁLHATÓAK A GENERÁLT KÓDBAN
+    // ONLY THESE NAMESPACES AND TYPES ARE ALLOWED IN THE GENERATED CODE
     private static readonly HashSet<string> AllowedNamespaces = new(StringComparer.Ordinal)
     {
         "System",
@@ -29,7 +29,7 @@ public class AstAnalyzer
         "Kreta.Dynamic"
     };
 
-    // EXPLICIT TILTOTT METÓDUSOK ÉS TÍPUSOK (MÉG HA REFL-EL VAGY TRÜKKÖSEN PRÓBÁLKOZNA IS)
+    // EXPLICITLY BANNED METHODS AND TYPES (EVEN IF ATTEMPTED VIA REFLECTION OR TRICKS)
     private static readonly HashSet<string> BannedTypesAndMethods = new(StringComparer.OrdinalIgnoreCase)
     {
         "Process", "Assembly", "MethodInfo", "MemberInfo", "FieldInfo", "PropertyInfo",
@@ -110,7 +110,7 @@ public class AstAnalyzer
             {
                 string callText = invocation.Expression.ToString();
 
-                // Ha a hívott elemben szerepel GetType, Invoke, Start, stb.
+                // If the invoked element includes GetType, Invoke, Start, etc.
                 if (callText.EndsWith(".GetType") || 
                     callText.EndsWith(".Invoke") || 
                     callText.Contains("GetMethod") || 
