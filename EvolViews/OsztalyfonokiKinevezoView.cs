@@ -3,40 +3,43 @@ using System.Collections.Generic;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
-using Avalonia.Interactivity;
-using Kreta.Core;
 using Kreta.Contexts;
+using Kreta.Core;
 
 public class OsztalyfonokiKinevezoView : IEvolView
 {
-    private IDirectorContext? _context;
+    private const string EntityType = "SchoolClassTeacher";
+    private readonly IDirectorContext? _context;
 
     private ListBox? _classListBox;
-    private ComboBox? _teacherComboBox;
-    private Button? _saveButton;
-    private TextBlock? _statusTextBlock;
-    private StackPanel? _detailsPanel;
-    private TextBlock? _selectedClassNameTextBlock;
-    private TextBlock? _warningTextBlock;
+    private List<GenericRecord>? _classTeacherRecords;
 
     private List<string>? _classes;
-    private List<User>? _teachers;
-    private List<GenericRecord>? _classTeacherRecords;
+    private StackPanel? _detailsPanel;
+    private Button? _saveButton;
     private string? _selectedClass;
+    private TextBlock? _selectedClassNameTextBlock;
+    private TextBlock? _statusTextBlock;
+    private ComboBox? _teacherComboBox;
+    private List<User>? _teachers;
+    private TextBlock? _warningTextBlock;
 
-    private const string EntityType = "SchoolClassTeacher";
-
-    public new string Name => "Osztályfőnöki Kinevezés";
-    public string Description => "Tanárok hozzárendelése osztályokhoz osztályfőnökként, figyelmeztetéssel, ha egy tanár már rendelkezik osztállyal.";
-
-    public OsztalyfonokiKinevezoView() { }
+    public OsztalyfonokiKinevezoView()
+    {
+    }
 
     public OsztalyfonokiKinevezoView(IDirectorContext context)
     {
         _context = context;
     }
+
+    public new string Name => "Osztályfőnöki Kinevezés";
+
+    public string Description =>
+        "Tanárok hozzárendelése osztályokhoz osztályfőnökként, figyelmeztetéssel, ha egy tanár már rendelkezik osztállyal.";
 
     public Control CreateView()
     {
@@ -59,10 +62,12 @@ public class OsztalyfonokiKinevezoView : IEvolView
         Grid.SetColumn(_detailsPanel, 1);
 
         _selectedClassNameTextBlock = new TextBlock { FontWeight = FontWeight.Bold, FontSize = 16 };
-        _teacherComboBox = new ComboBox { PlaceholderText = "Válassz tanárt...", HorizontalAlignment = HorizontalAlignment.Stretch };
+        _teacherComboBox = new ComboBox
+            { PlaceholderText = "Válassz tanárt...", HorizontalAlignment = HorizontalAlignment.Stretch };
         _teacherComboBox.SelectionChanged += TeacherComboBox_SelectionChanged;
-        
-        _warningTextBlock = new TextBlock { Foreground = Brushes.OrangeRed, IsVisible = false, TextWrapping = TextWrapping.Wrap };
+
+        _warningTextBlock = new TextBlock
+            { Foreground = Brushes.OrangeRed, IsVisible = false, TextWrapping = TextWrapping.Wrap };
 
         _saveButton = new Button { Content = "Kinevezés mentése" };
         _saveButton.Click += SaveButton_Click;
@@ -94,10 +99,7 @@ public class OsztalyfonokiKinevezoView : IEvolView
             _classTeacherRecords = _context.QueryEntities(EntityType);
 
             _classListBox.ItemsSource = _classes;
-            if (_teacherComboBox != null)
-            {
-                _teacherComboBox.ItemsSource = _teachers.Select(t => t.Name).ToList();
-            }
+            if (_teacherComboBox != null) _teacherComboBox.ItemsSource = _teachers.Select(t => t.Name).ToList();
         }
         catch (Exception ex)
         {
@@ -107,7 +109,8 @@ public class OsztalyfonokiKinevezoView : IEvolView
 
     private void ClassListBox_SelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (_classListBox?.SelectedItem is string selectedClass && _detailsPanel != null && _teacherComboBox != null && _teachers != null)
+        if (_classListBox?.SelectedItem is string selectedClass && _detailsPanel != null && _teacherComboBox != null &&
+            _teachers != null)
         {
             _selectedClass = selectedClass;
             _detailsPanel.IsVisible = true;
@@ -115,18 +118,15 @@ public class OsztalyfonokiKinevezoView : IEvolView
             SetStatus("", false);
             _warningTextBlock!.IsVisible = false;
 
-            var currentAssignment = _classTeacherRecords?.FirstOrDefault(r => r.Data.ContainsKey("ClassName") && r.Data["ClassName"] == _selectedClass);
+            var currentAssignment = _classTeacherRecords?.FirstOrDefault(r =>
+                r.Data.ContainsKey("ClassName") && r.Data["ClassName"] == _selectedClass);
             if (currentAssignment != null && currentAssignment.Data.TryGetValue("TeacherId", out var teacherIdStr))
             {
                 var assignedTeacher = _teachers.FirstOrDefault(t => t.Id.ToString() == teacherIdStr);
                 if (assignedTeacher != null)
-                {
                     _teacherComboBox.SelectedIndex = _teachers.IndexOf(assignedTeacher);
-                }
                 else
-                {
                     _teacherComboBox.SelectedIndex = -1;
-                }
             }
             else
             {
@@ -137,24 +137,26 @@ public class OsztalyfonokiKinevezoView : IEvolView
 
     private void TeacherComboBox_SelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (_warningTextBlock == null || _teacherComboBox == null || _teachers == null || _classTeacherRecords == null) return;
+        if (_warningTextBlock == null || _teacherComboBox == null || _teachers == null ||
+            _classTeacherRecords == null) return;
 
         _warningTextBlock.IsVisible = false;
         _warningTextBlock.Text = "";
 
-        int selectedIndex = _teacherComboBox.SelectedIndex;
+        var selectedIndex = _teacherComboBox.SelectedIndex;
         if (selectedIndex < 0 || selectedIndex >= _teachers.Count) return;
 
         var selectedTeacher = _teachers[selectedIndex];
-        var existingAssignment = _classTeacherRecords.FirstOrDefault(r => 
-            r.Data.TryGetValue("TeacherId", out var teacherId) && 
+        var existingAssignment = _classTeacherRecords.FirstOrDefault(r =>
+            r.Data.TryGetValue("TeacherId", out var teacherId) &&
             teacherId == selectedTeacher.Id.ToString() &&
             (!r.Data.TryGetValue("ClassName", out var className) || className != _selectedClass));
 
         if (existingAssignment != null)
         {
             var assignedClass = existingAssignment.Data.GetValueOrDefault("ClassName", "egy másik");
-            _warningTextBlock.Text = $"Figyelem: {selectedTeacher.Name} már a(z) {assignedClass} osztály osztályfőnöke.";
+            _warningTextBlock.Text =
+                $"Figyelem: {selectedTeacher.Name} már a(z) {assignedClass} osztály osztályfőnöke.";
             _warningTextBlock.IsVisible = true;
         }
     }
@@ -170,9 +172,10 @@ public class OsztalyfonokiKinevezoView : IEvolView
         try
         {
             var selectedTeacher = _teachers[_teacherComboBox.SelectedIndex];
-            
-            var existingRecord = _classTeacherRecords?.FirstOrDefault(r => r.Data.ContainsKey("ClassName") && r.Data["ClassName"] == _selectedClass);
-            int? recordId = existingRecord?.Id;
+
+            var existingRecord = _classTeacherRecords?.FirstOrDefault(r =>
+                r.Data.ContainsKey("ClassName") && r.Data["ClassName"] == _selectedClass);
+            var recordId = existingRecord?.Id;
 
             var data = new Dictionary<string, string>
             {
@@ -182,7 +185,7 @@ public class OsztalyfonokiKinevezoView : IEvolView
 
             _context.SaveEntity(EntityType, data, recordId);
             SetStatus("Sikeres mentés!", false);
-            LoadData(); 
+            LoadData();
         }
         catch (Exception ex)
         {

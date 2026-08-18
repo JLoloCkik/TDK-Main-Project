@@ -1,29 +1,32 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Globalization;
+using System.Linq;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
-using Kreta.Core;
 using Kreta.Contexts;
+using Kreta.Core;
 
 public class KozelgoDolgozatokView : IEvolView
 {
-    private IStudentContext? _context;
-    private ListBox? _testsListBox;
-    private TextBlock? _statusTextBlock;
     private const string TestEntityType = "Test";
+    private readonly IStudentContext? _context;
+    private TextBlock? _statusTextBlock;
+    private ListBox? _testsListBox;
 
-    public new string Name => "Közelgő Dolgozatok";
-    public string Description => "A diák számára kiírt, jövőbeli dolgozatok listája.";
-
-    public KozelgoDolgozatokView() { }
+    public KozelgoDolgozatokView()
+    {
+    }
 
     public KozelgoDolgozatokView(IStudentContext context)
     {
         _context = context;
     }
+
+    public new string Name => "Közelgő Dolgozatok";
+    public string Description => "A diák számára kiírt, jövőbeli dolgozatok listája.";
 
     public Control CreateView()
     {
@@ -32,14 +35,14 @@ public class KozelgoDolgozatokView : IEvolView
         {
             Text = "Adatok betöltése...",
             HorizontalAlignment = HorizontalAlignment.Center,
-            Margin = new Avalonia.Thickness(10)
+            Margin = new Thickness(10)
         };
 
         var mainPanel = new StackPanel
         {
             Orientation = Orientation.Vertical,
             Spacing = 10,
-            Margin = new Avalonia.Thickness(15),
+            Margin = new Thickness(15),
             Children =
             {
                 new TextBlock
@@ -81,18 +84,17 @@ public class KozelgoDolgozatokView : IEvolView
             var upcomingTests = new List<Tuple<DateTime, string>>();
 
             foreach (var test in allTests)
-            {
                 if (test.Data.TryGetValue("ClassName", out var className) && className == myClass &&
                     test.Data.TryGetValue("Date", out var dateString) &&
-                    DateTime.TryParse(dateString, CultureInfo.InvariantCulture, DateTimeStyles.None, out var testDate) &&
+                    DateTime.TryParse(dateString, CultureInfo.InvariantCulture, DateTimeStyles.None,
+                        out var testDate) &&
                     testDate.Date >= DateTime.Today)
                 {
-                    string subject = test.Data.TryGetValue("SubjectName", out var s) ? s : "Ismeretlen tantárgy";
-                    string topic = test.Data.TryGetValue("Topic", out var t) ? t : "Nincs megadva";
-                    string formattedTest = $"{testDate:yyyy. MM. dd.} - {subject}: {topic}";
+                    var subject = test.Data.TryGetValue("SubjectName", out var s) ? s : "Ismeretlen tantárgy";
+                    var topic = test.Data.TryGetValue("Topic", out var t) ? t : "Nincs megadva";
+                    var formattedTest = $"{testDate:yyyy. MM. dd.} - {subject}: {topic}";
                     upcomingTests.Add(new Tuple<DateTime, string>(testDate, formattedTest));
                 }
-            }
 
             if (upcomingTests.Any())
             {

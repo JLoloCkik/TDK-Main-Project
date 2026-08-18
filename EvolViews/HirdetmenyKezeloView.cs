@@ -1,41 +1,42 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
-using Avalonia.Interactivity;
-using Kreta.Core;
 using Kreta.Contexts;
+using Kreta.Core;
 
 public class HirdetmenyKezeloView : IEvolView
 {
-    private IDirectorContext? _context;
-    private ListBox? _noticesListBox;
-    private TextBox? _titleTextBox;
+    private const string EntityType = "IskolaiHirdetmeny";
+    private readonly IDirectorContext? _context;
     private TextBox? _contentTextBox;
-    private ComboBox? _priorityComboBox;
-    private CheckBox? _isActiveCheckBox;
-    private TextBlock? _statusTextBlock;
-    private Button? _saveButton;
     private Button? _deleteButton;
-    private Button? _newButton;
     private StackPanel? _editPanel;
+    private CheckBox? _isActiveCheckBox;
+    private Button? _newButton;
 
     private List<GenericRecord>? _notices;
+    private ListBox? _noticesListBox;
+    private ComboBox? _priorityComboBox;
+    private Button? _saveButton;
     private GenericRecord? _selectedNotice;
-    private const string EntityType = "IskolaiHirdetmeny";
+    private TextBlock? _statusTextBlock;
+    private TextBox? _titleTextBox;
 
-    public new string Name => "Hirdetmény Kezelő";
-    public string Description => "Iskolai hirdetmények létrehozása, szerkesztése és törlése, prioritással.";
-
-    public HirdetmenyKezeloView() { }
+    public HirdetmenyKezeloView()
+    {
+    }
 
     public HirdetmenyKezeloView(IDirectorContext context)
     {
         _context = context;
     }
+
+    public new string Name => "Hirdetmény Kezelő";
+    public string Description => "Iskolai hirdetmények létrehozása, szerkesztése és törlése, prioritással.";
 
     public Control CreateView()
     {
@@ -97,9 +98,11 @@ public class HirdetmenyKezeloView : IEvolView
 
         _editPanel.Children.Add(new TextBlock { Text = "Cím:", FontWeight = FontWeight.Bold });
         _editPanel.Children.Add(_titleTextBox);
-        _editPanel.Children.Add(new TextBlock { Text = "Tartalom:", FontWeight = FontWeight.Bold, Margin = new Thickness(0, 10, 0, 0) });
+        _editPanel.Children.Add(new TextBlock
+            { Text = "Tartalom:", FontWeight = FontWeight.Bold, Margin = new Thickness(0, 10, 0, 0) });
         _editPanel.Children.Add(_contentTextBox);
-        _editPanel.Children.Add(new TextBlock { Text = "Prioritás:", FontWeight = FontWeight.Bold, Margin = new Thickness(0, 10, 0, 0) });
+        _editPanel.Children.Add(new TextBlock
+            { Text = "Prioritás:", FontWeight = FontWeight.Bold, Margin = new Thickness(0, 10, 0, 0) });
         _editPanel.Children.Add(_priorityComboBox);
         _editPanel.Children.Add(_isActiveCheckBox);
         _editPanel.Children.Add(buttonPanel);
@@ -115,21 +118,22 @@ public class HirdetmenyKezeloView : IEvolView
     private void LoadNotices()
     {
         if (_context == null || _noticesListBox == null) return;
-        _notices = _context.QueryEntities(EntityType)?.OrderByDescending(n => n.Data.GetValueOrDefault("Priority", "Normál") == "Sürgős").ThenByDescending(n => n.Id).ToList();
+        _notices = _context.QueryEntities(EntityType)
+            ?.OrderByDescending(n => n.Data.GetValueOrDefault("Priority", "Normál") == "Sürgős")
+            .ThenByDescending(n => n.Id).ToList();
         if (_notices != null)
-        {
-            _noticesListBox.ItemsSource = _notices.Select(n => 
+            _noticesListBox.ItemsSource = _notices.Select(n =>
             {
-                string title = n.Data.GetValueOrDefault("Title", "Nincs cím");
-                string priority = n.Data.GetValueOrDefault("Priority", "Normál");
+                var title = n.Data.GetValueOrDefault("Title", "Nincs cím");
+                var priority = n.Data.GetValueOrDefault("Priority", "Normál");
                 return $"[{priority}] {title}";
             }).ToList();
-        }
     }
 
     private void NoticesListBox_SelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (_noticesListBox == null || _editPanel == null || _titleTextBox == null || _contentTextBox == null || _isActiveCheckBox == null || _priorityComboBox == null)
+        if (_noticesListBox == null || _editPanel == null || _titleTextBox == null || _contentTextBox == null ||
+            _isActiveCheckBox == null || _priorityComboBox == null)
             return;
 
         if (_noticesListBox.SelectedIndex != -1 && _notices != null)
@@ -138,7 +142,8 @@ public class HirdetmenyKezeloView : IEvolView
             _editPanel.IsVisible = true;
             _titleTextBox.Text = _selectedNotice.Data.GetValueOrDefault("Title", "");
             _contentTextBox.Text = _selectedNotice.Data.GetValueOrDefault("Content", "");
-            _isActiveCheckBox.IsChecked = bool.TryParse(_selectedNotice.Data.GetValueOrDefault("IsActive", "true"), out var isActive) && isActive;
+            _isActiveCheckBox.IsChecked =
+                bool.TryParse(_selectedNotice.Data.GetValueOrDefault("IsActive", "true"), out var isActive) && isActive;
             _priorityComboBox.SelectedItem = _selectedNotice.Data.GetValueOrDefault("Priority", "Normál");
             _statusTextBlock!.Text = string.Empty;
         }
@@ -146,7 +151,8 @@ public class HirdetmenyKezeloView : IEvolView
 
     private void NewButton_Click(object? sender, RoutedEventArgs e)
     {
-        if (_editPanel == null || _titleTextBox == null || _contentTextBox == null || _isActiveCheckBox == null || _priorityComboBox == null || _statusTextBlock == null || _noticesListBox == null) return;
+        if (_editPanel == null || _titleTextBox == null || _contentTextBox == null || _isActiveCheckBox == null ||
+            _priorityComboBox == null || _statusTextBlock == null || _noticesListBox == null) return;
         _selectedNotice = null;
         _noticesListBox.SelectedItem = null;
         _editPanel.IsVisible = true;
@@ -159,7 +165,8 @@ public class HirdetmenyKezeloView : IEvolView
 
     private void SaveButton_Click(object? sender, RoutedEventArgs e)
     {
-        if (_context == null || string.IsNullOrWhiteSpace(_titleTextBox?.Text) || string.IsNullOrWhiteSpace(_contentTextBox?.Text) || _statusTextBlock == null)
+        if (_context == null || string.IsNullOrWhiteSpace(_titleTextBox?.Text) ||
+            string.IsNullOrWhiteSpace(_contentTextBox?.Text) || _statusTextBlock == null)
         {
             if (_statusTextBlock != null) _statusTextBlock.Text = "Hiba: A cím és a tartalom megadása kötelező.";
             return;
@@ -176,7 +183,8 @@ public class HirdetmenyKezeloView : IEvolView
         var idToSave = _selectedNotice?.Id;
         var savedId = _context.SaveEntity(EntityType, data, idToSave);
 
-        _statusTextBlock.Text = idToSave.HasValue ? "Hirdetmény sikeresen frissítve." : "Hirdetmény sikeresen létrehozva.";
+        _statusTextBlock.Text =
+            idToSave.HasValue ? "Hirdetmény sikeresen frissítve." : "Hirdetmény sikeresen létrehozva.";
         LoadNotices();
     }
 

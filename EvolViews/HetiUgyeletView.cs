@@ -2,28 +2,31 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
-using Kreta.Core;
 using Kreta.Contexts;
+using Kreta.Core;
 
 public class HetiUgyeletView : IEvolView
 {
-    private IStudentContext? _context;
+    private const string EntityType = "StudentDutySchedule";
+    private readonly IStudentContext? _context;
     private ListBox? _dutyListBox;
     private TextBlock? _statusTextBlock;
-    private const string EntityType = "StudentDutySchedule";
 
-    public new string Name => "Heti Ügyeleti Beosztás";
-    public string Description => "A heti diákügyeleti beosztás megtekintése.";
-
-    public HetiUgyeletView() { }
+    public HetiUgyeletView()
+    {
+    }
 
     public HetiUgyeletView(IStudentContext context)
     {
         _context = context;
     }
+
+    public new string Name => "Heti Ügyeleti Beosztás";
+    public string Description => "A heti diákügyeleti beosztás megtekintése.";
 
     public Control CreateView()
     {
@@ -31,7 +34,7 @@ public class HetiUgyeletView : IEvolView
         {
             Orientation = Orientation.Vertical,
             Spacing = 10,
-            Margin = new Avalonia.Thickness(20)
+            Margin = new Thickness(20)
         };
 
         var title = new TextBlock
@@ -85,13 +88,15 @@ public class HetiUgyeletView : IEvolView
 
             var today = DateTime.Today;
             var cultureInfo = new CultureInfo("hu-HU");
-            int diff = (7 + (int)today.DayOfWeek - (int)DayOfWeek.Monday) % 7;
+            var diff = (7 + (int)today.DayOfWeek - (int)DayOfWeek.Monday) % 7;
             var startOfWeek = today.AddDays(-1 * diff).Date;
             var endOfWeek = startOfWeek.AddDays(6).Date;
 
             var weeklyDuties = allDuties
-                .Select(duty => {
-                    DateTime.TryParse(duty.Data.GetValueOrDefault("DutyDate"), CultureInfo.InvariantCulture, DateTimeStyles.None, out var dutyDate);
+                .Select(duty =>
+                {
+                    DateTime.TryParse(duty.Data.GetValueOrDefault("DutyDate"), CultureInfo.InvariantCulture,
+                        DateTimeStyles.None, out var dutyDate);
                     return new { Duty = duty, Date = dutyDate, HasDate = duty.Data.ContainsKey("DutyDate") };
                 })
                 .Where(d => d.HasDate && d.Date >= startOfWeek && d.Date <= endOfWeek)
@@ -104,8 +109,8 @@ public class HetiUgyeletView : IEvolView
                 _dutyListBox.ItemsSource = null;
                 return;
             }
-            
-            var displayItems = weeklyDuties.Select(item => 
+
+            var displayItems = weeklyDuties.Select(item =>
             {
                 var dateDisplay = item.Date.ToString("yyyy. MM. dd.");
                 var dayName = cultureInfo.DateTimeFormat.GetDayName(item.Date.DayOfWeek);

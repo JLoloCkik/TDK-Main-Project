@@ -1,28 +1,30 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
-using Kreta.Core;
 using Kreta.Contexts;
+using Kreta.Core;
 
 public class KonyvtarListaView : IEvolView
 {
-    private IStudentContext? _context;
+    private const string EntityType = "LibraryBook";
+    private readonly IStudentContext? _context;
     private ListBox? _bookListBox;
     private TextBlock? _statusTextBlock;
-    private const string EntityType = "LibraryBook";
 
-    public new string Name => "Könyvtári Könyvek";
-    public string Description => "Az iskolai könyvtárban elérhető könyvek listájának megtekintése.";
-
-    public KonyvtarListaView() { }
+    public KonyvtarListaView()
+    {
+    }
 
     public KonyvtarListaView(IStudentContext context)
     {
         _context = context;
     }
+
+    public new string Name => "Könyvtári Könyvek";
+    public string Description => "Az iskolai könyvtárban elérhető könyvek listájának megtekintése.";
 
     public Control CreateView()
     {
@@ -30,7 +32,7 @@ public class KonyvtarListaView : IEvolView
         {
             Orientation = Orientation.Vertical,
             Spacing = 10,
-            Margin = new Avalonia.Thickness(15)
+            Margin = new Thickness(15)
         };
 
         var title = new TextBlock
@@ -45,7 +47,7 @@ public class KonyvtarListaView : IEvolView
         {
             Text = "Könyvek betöltése...",
             HorizontalAlignment = HorizontalAlignment.Center,
-            Margin = new Avalonia.Thickness(0, 20, 0, 0)
+            Margin = new Thickness(0, 20, 0, 0)
         };
 
         _bookListBox = new ListBox
@@ -75,10 +77,11 @@ public class KonyvtarListaView : IEvolView
 
         if (books != null && books.Any())
         {
-            var bookItems = books.Select(book => {
-                string title = book.Data.GetValueOrDefault("Title", "Ismeretlen cím");
-                string author = book.Data.GetValueOrDefault("Author", "Ismeretlen szerző");
-                string available = book.Data.GetValueOrDefault("AvailableCopies", "0");
+            var bookItems = books.Select(book =>
+            {
+                var title = book.Data.GetValueOrDefault("Title", "Ismeretlen cím");
+                var author = book.Data.GetValueOrDefault("Author", "Ismeretlen szerző");
+                var available = book.Data.GetValueOrDefault("AvailableCopies", "0");
                 return $"{title} - {author} ({available} db elérhető)";
             }).ToList();
 

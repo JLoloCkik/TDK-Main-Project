@@ -2,8 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
 using Avalonia.Media;
 using Kreta.Contexts;
 using Kreta.Core;
@@ -18,23 +21,24 @@ namespace Kreta;
 
 public partial class MainWindow : Window
 {
-    private readonly IEvolutionService _evolutionService;
-    private readonly IDynamicLoader _dynamicLoader;
     private readonly KretaDbContext _dbContext;
+    private readonly IDynamicLoader _dynamicLoader;
     private readonly string _evolViewsDirectory;
+    private readonly IEvolutionService _evolutionService;
 
     private readonly List<IEvolView> _loadedViews = new();
     private readonly Dictionary<IEvolView, string> _viewFilePathMap = new();
-
-    private EvolveResult? _lastEvolveResult;
     private Role _currentRole = Role.Student;
 
+    private EvolveResult? _lastEvolveResult;
+
     /// <summary>
-    /// The view currently selected/opened by the user in the sidebar, and its file path.
-    /// While set, the next AI request will DIRECTLY modify/fix this view
-    /// instead of the system having to guess which one it is from free text.
+    ///     The view currently selected/opened by the user in the sidebar, and its file path.
+    ///     While set, the next AI request will DIRECTLY modify/fix this view
+    ///     instead of the system having to guess which one it is from free text.
     /// </summary>
     private IEvolView? _selectedView;
+
     private string? _selectedViewFilePath;
 
     public MainWindow()
@@ -58,7 +62,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// On system startup, loads and compiles the C# views found on the disk without deleting them.
+    ///     On system startup, loads and compiles the C# views found on the disk without deleting them.
     /// </summary>
     private void BootAndCompileSavedModules()
     {
@@ -67,14 +71,14 @@ public partial class MainWindow : Window
             var files = Directory.GetFiles(_evolViewsDirectory, "*.cs");
             if (files.Length == 0) return;
 
-            EvolverStatusText.Text = "🟢 Evolution Engine: Loading...";
+            EvolverStatusText.Text = "Evolution Engine: Loading...";
             StatusText.Text = $"Loading {files.Length} saved modules from disk...";
             StatusText.Foreground = Brushes.Orange;
 
             _loadedViews.Clear();
             _viewFilePathMap.Clear();
 
-            int loadedCount = 0;
+            var loadedCount = 0;
 
             foreach (var file in files)
             {
@@ -104,7 +108,7 @@ public partial class MainWindow : Window
                 }
             }
 
-            EvolverStatusText.Text = "🟢 Evolution Engine: Active";
+            EvolverStatusText.Text = "Evolution Engine: Active";
             StatusText.Text = $"{loadedCount} modules successfully loaded from disk.";
             StatusText.Foreground = Brushes.Green;
 
@@ -118,7 +122,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Instantiates the compiled C# class with the appropriate database context (Student, Teacher, Director).
+    ///     Instantiates the compiled C# class with the appropriate database context (Student, Teacher, Director).
     /// </summary>
     private IEvolView? InstantiateViewForRole(Type type)
     {
@@ -138,11 +142,13 @@ public partial class MainWindow : Window
                         var context = new SqliteStudentContext(_dbContext, 1);
                         return Activator.CreateInstance(type, context) as IEvolView;
                     }
+
                     if (paramType == typeof(ITeacherContext))
                     {
                         var context = new SqliteTeacherContext(_dbContext);
                         return Activator.CreateInstance(type, context) as IEvolView;
                     }
+
                     if (paramType == typeof(IDirectorContext))
                     {
                         var context = new SqliteDirectorContext(_dbContext);
@@ -152,10 +158,7 @@ public partial class MainWindow : Window
             }
 
             var defaultCtor = type.GetConstructor(Type.EmptyTypes);
-            if (defaultCtor != null)
-            {
-                return Activator.CreateInstance(type) as IEvolView;
-            }
+            if (defaultCtor != null) return Activator.CreateInstance(type) as IEvolView;
         }
         catch (Exception ex)
         {
@@ -166,7 +169,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Strictly checks if the given view is allowed to appear in the menu of the current role.
+    ///     Strictly checks if the given view is allowed to appear in the menu of the current role.
     /// </summary>
     private bool IsViewAllowedForRole(IEvolView view, Role role)
     {
@@ -174,21 +177,19 @@ public partial class MainWindow : Window
         var ctors = type.GetConstructors();
 
         foreach (var ctor in ctors)
+        foreach (var param in ctor.GetParameters())
         {
-            foreach (var param in ctor.GetParameters())
-            {
-                // Student context view can only be displayed to students
-                if (param.ParameterType == typeof(IStudentContext) && role != Role.Student)
-                    return false;
+            // Student context view can only be displayed to students
+            if (param.ParameterType == typeof(IStudentContext) && role != Role.Student)
+                return false;
 
-                // Teacher context view can only be displayed to teachers
-                if (param.ParameterType == typeof(ITeacherContext) && role != Role.Teacher)
-                    return false;
+            // Teacher context view can only be displayed to teachers
+            if (param.ParameterType == typeof(ITeacherContext) && role != Role.Teacher)
+                return false;
 
-                // Director context view can only be displayed to directors
-                if (param.ParameterType == typeof(IDirectorContext) && role != Role.Director)
-                    return false;
-            }
+            // Director context view can only be displayed to directors
+            if (param.ParameterType == typeof(IDirectorContext) && role != Role.Director)
+                return false;
         }
 
         // Strict filtering based on namespace (e.g. Kreta.Evol.Student)
@@ -217,12 +218,12 @@ public partial class MainWindow : Window
             var btn = new Button
             {
                 Content = view.Name,
-                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch,
-                HorizontalContentAlignment = Avalonia.Layout.HorizontalAlignment.Left,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                HorizontalContentAlignment = HorizontalAlignment.Left,
                 Background = Brushes.Transparent,
                 Foreground = Brushes.White,
-                Padding = new Avalonia.Thickness(12, 10),
-                CornerRadius = new Avalonia.CornerRadius(6),
+                Padding = new Thickness(12, 10),
+                CornerRadius = new CornerRadius(6),
                 Tag = view
             };
 
@@ -234,7 +235,6 @@ public partial class MainWindow : Window
     private void OnSidebarButtonClick(object? sender, RoutedEventArgs e)
     {
         if (sender is Button button && button.Tag is IEvolView view)
-        {
             try
             {
                 var freshInstance = InstantiateViewForRole(view.GetType()) ?? view;
@@ -254,12 +254,11 @@ public partial class MainWindow : Window
                 StatusText.Foreground = Brushes.Red;
                 Console.WriteLine($"[View opening error]: {ex}");
             }
-        }
     }
 
     /// <summary>
-    /// Selects a view: stores its file path and displays the selection banner so the user
-    /// can see that the next AI request will directly modify this.
+    ///     Selects a view: stores its file path and displays the selection banner so the user
+    ///     can see that the next AI request will directly modify this.
     /// </summary>
     private void SelectView(IEvolView view, string? filePath, string displayName)
     {
@@ -279,7 +278,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Clears the selection: the next AI request will be treated as a brand new feature again.
+    ///     Clears the selection: the next AI request will be treated as a brand new feature again.
     /// </summary>
     private void ClearSelection()
     {
@@ -327,12 +326,13 @@ public partial class MainWindow : Window
 
         try
         {
-            var result = await _evolutionService.EvolveAsync(prompt, _currentRole, targetViewFilePath: _selectedViewFilePath);
+            var result =
+                await _evolutionService.EvolveAsync(prompt, _currentRole, targetViewFilePath: _selectedViewFilePath);
             _lastEvolveResult = result;
 
             if (result.IsRejectedAction)
             {
-                StatusText.Text = $"❌ Access denied: {result.Description}";
+                StatusText.Text = $"Access denied: {result.Description}";
                 StatusText.Foreground = Brushes.Red;
                 MainContentArea.Content = null;
                 ApproveButton.IsVisible = false;
@@ -342,7 +342,7 @@ public partial class MainWindow : Window
 
             if (result.IsDeletedAction)
             {
-                StatusText.Text = $"🗑️ Module deleted: {result.ViewName}";
+                StatusText.Text = $"Module deleted: {result.ViewName}";
                 StatusText.Foreground = Brushes.Yellow;
                 MainContentArea.Content = null;
 
@@ -414,7 +414,7 @@ public partial class MainWindow : Window
         await OnApproveButtonClickInternal();
     }
 
-    private async System.Threading.Tasks.Task OnApproveButtonClickInternal()
+    private async Task OnApproveButtonClickInternal()
     {
         if (_lastEvolveResult == null || string.IsNullOrWhiteSpace(_lastEvolveResult.FilePath))
         {
@@ -425,7 +425,7 @@ public partial class MainWindow : Window
         StatusText.Text = "Approving feature and uploading (Git Push)...";
         StatusText.Foreground = Brushes.Orange;
 
-        bool pushSuccess = await _evolutionService.AcceptAndPushFeatureAsync(
+        var pushSuccess = await _evolutionService.AcceptAndPushFeatureAsync(
             _lastEvolveResult.FilePath,
             _lastEvolveResult.ViewName ?? "New View"
         );
@@ -453,7 +453,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        bool deleted = await _evolutionService.DiscardFeatureAsync(_lastEvolveResult.FilePath);
+        var deleted = await _evolutionService.DiscardFeatureAsync(_lastEvolveResult.FilePath);
         if (deleted)
         {
             StatusText.Text = "Feature discarded and deleted from disk.";
@@ -462,9 +462,7 @@ public partial class MainWindow : Window
 
             // If the discarded file was selected, selection is no longer valid - clear it.
             if (string.Equals(_selectedViewFilePath, _lastEvolveResult.FilePath, StringComparison.OrdinalIgnoreCase))
-            {
                 ClearSelection();
-            }
 
             if (_lastEvolveResult.CompiledAssembly != null)
             {
@@ -482,26 +480,29 @@ public partial class MainWindow : Window
         ApproveButton.IsVisible = false;
         DiscardButton.IsVisible = false;
     }
+
     private async void RunAutomatedBenchmark()
     {
         var runner = new AutomatedTestRunner(_evolutionService, new AstAnalyzer(), new PromptConformanceVerifier());
 
         // 1. Runs the 100 tests
         var results = await runner.RunAllTestsAsync(
-            delayBetweenTestsMs: 1000, 
-            progressCallback: (current, total, result) => {
-                Console.WriteLine($"[Progress: {current}/{total}] {result.Prompt} -> {(result.IsSuccess ? "OK" : "ERROR")}");
+            delayBetweenTestsMs: 1000,
+            progressCallback: (current, total, result) =>
+            {
+                Console.WriteLine(
+                    $"[Progress: {current}/{total}] {result.Prompt} -> {(result.IsSuccess ? "OK" : "ERROR")}");
             }
         );
 
         // 2. Generates the updated Markdown report
-        string markdownReport = runner.ExportToMarkdownReport(results);
+        var markdownReport = runner.ExportToMarkdownReport(results);
 
         // 3. Saves to disk directly over the Markdown file location
         File.WriteAllText("teszt_adatkeszlet_100.md", markdownReport);
-        Console.WriteLine("🟢 Measurement data updated in 'teszt_adatkeszlet_100.md' file!");
+        Console.WriteLine("Measurement data updated in 'teszt_adatkeszlet_100.md' file!");
     }
-    
+
 
     private void SetBusy(bool isBusy)
     {

@@ -1,53 +1,56 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Globalization;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
-using Avalonia.Interactivity;
-using Kreta.Core;
 using Kreta.Contexts;
+using Kreta.Core;
 
 public class JelenletRogzitoView : IEvolView
 {
-    private ITeacherContext? _context;
-
-    private StackPanel? _lessonCreationPanel;
-    private ComboBox? _classComboBox;
-    private ComboBox? _subjectComboBox;
-    private DatePicker? _datePicker;
-    private TextBox? _topicTextBox;
-    private Button? _createLessonButton;
-
-    private StackPanel? _attendancePanel;
-    private TextBlock? _attendanceHeader;
-    private StackPanel? _studentListPanel; 
-    private Button? _saveAttendanceButton;
-    
-    private TextBlock? _statusTextBlock;
+    private readonly ITeacherContext? _context;
 
     private List<string>? _allClasses;
     private List<Subject>? _allSubjects;
-    private List<User>? _currentStudents;
+    private TextBlock? _attendanceHeader;
+
+    private StackPanel? _attendancePanel;
+    private ComboBox? _classComboBox;
+    private Button? _createLessonButton;
     private int? _currentLessonId;
+    private List<User>? _currentStudents;
+    private DatePicker? _datePicker;
 
-    public new string Name => "Jelenléti Ív";
-    public string Description => "Tanórák létrehozása és a diákok jelenlétének rögzítése, késésekkel együtt.";
+    private StackPanel? _lessonCreationPanel;
+    private Button? _saveAttendanceButton;
 
-    public JelenletRogzitoView() { }
+    private TextBlock? _statusTextBlock;
+    private StackPanel? _studentListPanel;
+    private ComboBox? _subjectComboBox;
+    private TextBox? _topicTextBox;
+
+    public JelenletRogzitoView()
+    {
+    }
 
     public JelenletRogzitoView(ITeacherContext context)
     {
         _context = context;
     }
 
+    public new string Name => "Jelenléti Ív";
+    public string Description => "Tanórák létrehozása és a diákok jelenlétének rögzítése, késésekkel együtt.";
+
     public Control CreateView()
     {
         var mainPanel = new StackPanel { Spacing = 15, Margin = new Thickness(20) };
 
-        _statusTextBlock = new TextBlock { HorizontalAlignment = HorizontalAlignment.Center, FontWeight = FontWeight.Bold };
+        _statusTextBlock = new TextBlock
+            { HorizontalAlignment = HorizontalAlignment.Center, FontWeight = FontWeight.Bold };
 
         // Panel 1: Lesson Creation
         _lessonCreationPanel = new StackPanel { Spacing = 10 };
@@ -58,7 +61,8 @@ public class JelenletRogzitoView : IEvolView
         _createLessonButton = new Button { Content = "Óra létrehozása és jelenlét rögzítése" };
         _createLessonButton.Click += CreateLesson;
 
-        _lessonCreationPanel.Children.Add(new TextBlock { Text = "1. Tanóra adatai", FontSize = 16, FontWeight = FontWeight.Bold });
+        _lessonCreationPanel.Children.Add(new TextBlock
+            { Text = "1. Tanóra adatai", FontSize = 16, FontWeight = FontWeight.Bold });
         _lessonCreationPanel.Children.Add(_classComboBox);
         _lessonCreationPanel.Children.Add(_subjectComboBox);
         _lessonCreationPanel.Children.Add(_datePicker);
@@ -98,7 +102,8 @@ public class JelenletRogzitoView : IEvolView
 
     private void CreateLesson(object? sender, RoutedEventArgs e)
     {
-        if (_context == null || _classComboBox?.SelectedItem == null || _subjectComboBox?.SelectedItem == null || _datePicker?.SelectedDate == null || string.IsNullOrWhiteSpace(_topicTextBox?.Text))
+        if (_context == null || _classComboBox?.SelectedItem == null || _subjectComboBox?.SelectedItem == null ||
+            _datePicker?.SelectedDate == null || string.IsNullOrWhiteSpace(_topicTextBox?.Text))
         {
             if (_statusTextBlock != null) _statusTextBlock.Text = "Minden mezőt ki kell tölteni az óra létrehozásához!";
             return;
@@ -115,10 +120,11 @@ public class JelenletRogzitoView : IEvolView
         };
 
         _currentLessonId = _context.SaveEntity("Lesson", lessonData);
-        
+
         _currentStudents = _context.GetMyClassStudents().Where(s => s.ClassName == selectedClass).ToList();
 
-        if (_attendanceHeader != null) _attendanceHeader.Text = $"2. Jelenlét rögzítése: {selectedClass} - {selectedSubject}";
+        if (_attendanceHeader != null)
+            _attendanceHeader.Text = $"2. Jelenlét rögzítése: {selectedClass} - {selectedSubject}";
         PopulateStudentList(_currentStudents);
 
         if (_lessonCreationPanel != null) _lessonCreationPanel.IsVisible = false;
@@ -179,13 +185,11 @@ public class JelenletRogzitoView : IEvolView
 
             latePanel.Children.Add(lateLabel);
             latePanel.Children.Add(lateMinutesTextBox);
-            
+
             attendanceComboBox.SelectionChanged += (sender, e) =>
             {
                 if (sender is ComboBox cb && cb.SelectedItem is string selected)
-                {
                     latePanel.IsVisible = selected == "Késik";
-                }
             };
 
             studentPanel.Children.Add(nameText);
@@ -198,11 +202,11 @@ public class JelenletRogzitoView : IEvolView
 
     private void SaveAttendance(object? sender, RoutedEventArgs e)
     {
-        if (_context == null || _currentLessonId == null || _studentListPanel == null || _statusTextBlock == null || _datePicker?.SelectedDate == null) return;
+        if (_context == null || _currentLessonId == null || _studentListPanel == null || _statusTextBlock == null ||
+            _datePicker?.SelectedDate == null) return;
 
-        int savedCount = 0;
-        foreach (Control child in _studentListPanel.Children)
-        {
+        var savedCount = 0;
+        foreach (var child in _studentListPanel.Children)
             if (child is StackPanel studentPanel && studentPanel.Tag is User student)
             {
                 var comboBox = studentPanel.FindControl<ComboBox>("AttendanceComboBox");
@@ -219,21 +223,16 @@ public class JelenletRogzitoView : IEvolView
                     if (state == "Késik")
                     {
                         var lateTextBox = studentPanel.FindControl<TextBox>("LateMinutesTextBox");
-                        if (int.TryParse(lateTextBox?.Text, out int minutes) && minutes > 0)
-                        {
+                        if (int.TryParse(lateTextBox?.Text, out var minutes) && minutes > 0)
                             absenceData.Add("LatenessInMinutes", minutes.ToString());
-                        }
                         else
-                        {
                             absenceData.Add("LatenessInMinutes", "0");
-                        }
                     }
 
                     _context.SaveEntity("Absence", absenceData);
                     savedCount++;
                 }
             }
-        }
 
         _statusTextBlock.Text = $"{savedCount} hiányzás/késés rögzítve.";
         if (_attendancePanel != null) _attendancePanel.IsVisible = false;

@@ -1,27 +1,31 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
-using Kreta.Core;
 using Kreta.Contexts;
+using Kreta.Core;
 
 public class KonyvtarKeresoView : IEvolView
 {
-    private IStudentContext? _context;
-    private TextBox? _keresoBox;
+    private readonly IStudentContext? _context;
     private ListBox? _eredmenyListBox;
+    private TextBox? _keresoBox;
 
-    public new string Name => "Könyvtári Kereső";
-    public string Description => "Egy egyszerű felület az iskolai könyvtár könyveinek kereséséhez.";
-
-    public KonyvtarKeresoView() { }
+    public KonyvtarKeresoView()
+    {
+    }
 
     public KonyvtarKeresoView(IStudentContext context)
     {
         _context = context;
     }
+
+    public new string Name => "Könyvtári Kereső";
+    public string Description => "Egy egyszerű felület az iskolai könyvtár könyveinek kereséséhez.";
 
     public Control CreateView()
     {
@@ -29,7 +33,7 @@ public class KonyvtarKeresoView : IEvolView
         {
             Orientation = Orientation.Vertical,
             Spacing = 10,
-            Margin = new Avalonia.Thickness(15)
+            Margin = new Thickness(15)
         };
 
         var searchPanel = new StackPanel
@@ -56,7 +60,7 @@ public class KonyvtarKeresoView : IEvolView
         _eredmenyListBox = new ListBox
         {
             Height = 400,
-            Margin = new Avalonia.Thickness(0, 10, 0, 0)
+            Margin = new Thickness(0, 10, 0, 0)
         };
 
         mainPanel.Children.Add(new TextBlock { Text = "Könyvkeresés", FontSize = 20, FontWeight = FontWeight.Bold });
@@ -69,7 +73,7 @@ public class KonyvtarKeresoView : IEvolView
         return mainPanel;
     }
 
-    private void KeresesButton_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void KeresesButton_Click(object? sender, RoutedEventArgs e)
     {
         var searchTerm = _keresoBox?.Text ?? string.Empty;
         LoadBooks(searchTerm);
@@ -77,10 +81,7 @@ public class KonyvtarKeresoView : IEvolView
 
     private void LoadBooks(string searchTerm)
     {
-        if (_context == null || _eredmenyListBox == null)
-        {
-            return;
-        }
+        if (_context == null || _eredmenyListBox == null) return;
 
         var allBooks = _context.QueryEntities("LibraryBook");
 
@@ -92,7 +93,7 @@ public class KonyvtarKeresoView : IEvolView
             var title = book.Data.GetValueOrDefault("Title", string.Empty);
             var author = book.Data.GetValueOrDefault("Author", string.Empty);
 
-            return title.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) || 
+            return title.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
                    author.Contains(searchTerm, StringComparison.OrdinalIgnoreCase);
         }).ToList();
 

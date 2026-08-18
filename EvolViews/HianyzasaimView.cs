@@ -1,32 +1,33 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
-using Avalonia.Interactivity;
-using Kreta.Core;
 using Kreta.Contexts;
+using Kreta.Core;
 
 public class HianyzasaimView : IEvolView
 {
-    private IStudentContext? _context;
+    private readonly IStudentContext? _context;
     private ListBox? _absencesListBox;
-    private TextBlock? _unjustifiedCountText;
-    private TextBlock? _statusText;
     private User? _currentUser;
+    private TextBlock? _statusText;
+    private TextBlock? _unjustifiedCountText;
 
-    public new string Name => "Hiányzásaim";
-    public string Description => "A diák saját hiányzásainak listázása és az igazolatlan órák számának összegzése.";
-
-    public HianyzasaimView() { }
+    public HianyzasaimView()
+    {
+    }
 
     public HianyzasaimView(IStudentContext context)
     {
         _context = context;
     }
+
+    public new string Name => "Hiányzásaim";
+    public string Description => "A diák saját hiányzásainak listázása és az igazolatlan órák számának összegzése.";
 
     public Control CreateView()
     {
@@ -57,7 +58,7 @@ public class HianyzasaimView : IEvolView
             Height = 400,
             Margin = new Thickness(0, 10, 0, 0)
         };
-        
+
         _statusText = new TextBlock
         {
             Text = "Adatok betöltése...",
@@ -83,7 +84,7 @@ public class HianyzasaimView : IEvolView
     {
         if (_context == null || _absencesListBox == null || _unjustifiedCountText == null || _statusText == null)
         {
-            if (_statusText != null) 
+            if (_statusText != null)
                 _statusText.Text = "Hiba: A nézet nincs megfelelően inicializálva.";
             return;
         }
@@ -111,17 +112,19 @@ public class HianyzasaimView : IEvolView
             .OrderByDescending(a => a.Data.ContainsKey("Date") ? DateTime.Parse(a.Data["Date"]) : DateTime.MinValue)
             .ToList();
 
-        var formattedAbsences = myAbsences.Select(a => {
-            string date = a.Data.TryGetValue("Date", out var d) ? d : "N/A";
-            string subject = a.Data.TryGetValue("SubjectName", out var s) ? s : "Ismeretlen";
-            string state = a.Data.TryGetValue("JustificationState", out var st) ? st : "Ismeretlen";
+        var formattedAbsences = myAbsences.Select(a =>
+        {
+            var date = a.Data.TryGetValue("Date", out var d) ? d : "N/A";
+            var subject = a.Data.TryGetValue("SubjectName", out var s) ? s : "Ismeretlen";
+            var state = a.Data.TryGetValue("JustificationState", out var st) ? st : "Ismeretlen";
             return $"{date} - {subject} ({state})";
         }).ToList();
 
         _absencesListBox.ItemsSource = formattedAbsences;
 
-        int unjustifiedCount = myAbsences.Count(a => a.Data.TryGetValue("JustificationState", out var st) && st == "Unjustified");
-        
+        var unjustifiedCount =
+            myAbsences.Count(a => a.Data.TryGetValue("JustificationState", out var st) && st == "Unjustified");
+
         _unjustifiedCountText.Text = $"Igazolatlan órák száma: {unjustifiedCount}";
         _statusText.Text = $"Sikeresen betöltve {myAbsences.Count} hiányzás.";
     }

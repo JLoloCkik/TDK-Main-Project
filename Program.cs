@@ -1,7 +1,6 @@
-using Avalonia;
 using System;
-using System.Linq;
 using System.Threading.Tasks;
+using Avalonia;
 using Kreta.Services.AI;
 using Kreta.Services.Database;
 using Kreta.Services.Evolution;
@@ -10,7 +9,7 @@ using Kreta.Services.Testing;
 
 namespace Kreta;
 
-class Program
+internal class Program
 {
     [STAThread]
     public static async Task Main(string[] args)
@@ -18,7 +17,7 @@ class Program
         // dotnet run -- --benchmark
         if (args.Contains("--benchmark"))
         {
-            Console.WriteLine("🚀 Starting automated benchmark session in CLI mode...");
+            Console.WriteLine("[CLI] Starting automated benchmark session in CLI mode...");
 
             try
             {
@@ -32,21 +31,21 @@ class Program
                 var runner = new AutomatedTestRunner(evolutionService, astAnalyzer, conformanceVerifier);
 
                 await runner.RunAllTestsAsync(
-                    resumeFromCheckpoint: true,
-                    delayBetweenTestsMs: 1500,
-                    perTestTimeoutMs: 60000,
-                    progressCallback: (current, total, result) =>
+                    true,
+                    1500,
+                    60000,
+                    (current, total, result) =>
                     {
-                        string status = result.IsSuccess ? "🟢 OK" : "🔴 ERROR";
+                        var status = result.IsSuccess ? "[OK]" : "[ERROR]";
                         Console.WriteLine($"[{current}/{total}] {result.Prompt} -> {status}");
                     }
                 );
 
-                Console.WriteLine("🟢 Benchmark completed, output files updated!");
+                Console.WriteLine("[SUCCESS] Benchmark completed, output files updated!");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ Error during test run: {ex.Message}");
+                Console.WriteLine($"[ERROR] Error during test run: {ex.Message}");
             }
 
             return; // Exit, do not start the GUI

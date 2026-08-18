@@ -1,52 +1,54 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Globalization;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
-using Avalonia.Interactivity;
-using Kreta.Core;
 using Kreta.Contexts;
+using Kreta.Core;
 
 public class ExcursionPaymentTrackingView : IEvolView
 {
-    private ITeacherContext? _context;
-
-    private ComboBox? _excursionComboBox;
-    private ListBox? _studentListBox;
-    private StackPanel? _detailsPanel;
-    private TextBlock? _statusTextBlock;
-    private TextBlock? _studentNameTextBlock;
-    private TextBlock? _paymentInfoTextBlock;
-    private TextBox? _amountTextBox;
-    private Button? _saveButton;
-
-    private List<GenericRecord>? _allExcursions;
-    private List<User>? _classStudents;
-    private List<GenericRecord>? _allPayments;
-    private GenericRecord? _selectedExcursion;
-    private User? _selectedStudent;
-
     private const string ExcursionEntityType = "Excursion";
     private const string PaymentEntityType = "ExcursionPayment";
+    private readonly ITeacherContext? _context;
 
-    public new string Name => "Kirándulás Befizetések";
-    public string Description => "Kirándulásokhoz tartozó diák befizetések követése.";
+    private List<GenericRecord>? _allExcursions;
+    private List<GenericRecord>? _allPayments;
+    private TextBox? _amountTextBox;
+    private List<User>? _classStudents;
+    private StackPanel? _detailsPanel;
 
-    public ExcursionPaymentTrackingView() { }
+    private ComboBox? _excursionComboBox;
+    private TextBlock? _paymentInfoTextBlock;
+    private Button? _saveButton;
+    private GenericRecord? _selectedExcursion;
+    private User? _selectedStudent;
+    private TextBlock? _statusTextBlock;
+    private ListBox? _studentListBox;
+    private TextBlock? _studentNameTextBlock;
+
+    public ExcursionPaymentTrackingView()
+    {
+    }
 
     public ExcursionPaymentTrackingView(ITeacherContext context)
     {
         _context = context;
     }
 
+    public new string Name => "Kirándulás Befizetések";
+    public string Description => "Kirándulásokhoz tartozó diák befizetések követése.";
+
     public Control CreateView()
     {
         var mainPanel = new DockPanel();
 
-        var topPanel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, Margin = new Thickness(10) };
+        var topPanel = new StackPanel
+            { Orientation = Orientation.Horizontal, Spacing = 10, Margin = new Thickness(10) };
         topPanel.Children.Add(new TextBlock { Text = "Kirándulás:", VerticalAlignment = VerticalAlignment.Center });
         _excursionComboBox = new ComboBox { Width = 250 };
         _excursionComboBox.SelectionChanged += OnExcursionSelectionChanged;
@@ -65,7 +67,8 @@ public class ExcursionPaymentTrackingView : IEvolView
         _studentNameTextBlock = new TextBlock { FontWeight = FontWeight.Bold };
         _paymentInfoTextBlock = new TextBlock { TextWrapping = TextWrapping.Wrap };
         var amountPanel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 5 };
-        amountPanel.Children.Add(new TextBlock { Text = "Új befizetés:", VerticalAlignment = VerticalAlignment.Center });
+        amountPanel.Children.Add(new TextBlock
+            { Text = "Új befizetés:", VerticalAlignment = VerticalAlignment.Center });
         _amountTextBox = new TextBox { Width = 100 };
         amountPanel.Children.Add(_amountTextBox);
         _saveButton = new Button { Content = "Mentés" };
@@ -79,14 +82,14 @@ public class ExcursionPaymentTrackingView : IEvolView
 
         _statusTextBlock = new TextBlock { Margin = new Thickness(10), Height = 20 };
         DockPanel.SetDock(_statusTextBlock, Dock.Bottom);
-        
-        _studentListBox = new ListBox { Margin = new Thickness(10,0,10,10) };
+
+        _studentListBox = new ListBox { Margin = new Thickness(10, 0, 10, 10) };
         _studentListBox.SelectionChanged += OnStudentSelectionChanged;
 
         mainPanel.Children.Add(topPanel);
         mainPanel.Children.Add(_statusTextBlock);
         mainPanel.Children.Add(_detailsPanel);
-        mainPanel.Children.Add(_studentListBox); 
+        mainPanel.Children.Add(_studentListBox);
 
         LoadInitialData();
 
@@ -105,15 +108,11 @@ public class ExcursionPaymentTrackingView : IEvolView
         {
             _allExcursions = _context.QueryEntities(ExcursionEntityType);
             if (_excursionComboBox != null)
-            {
-                _excursionComboBox.ItemsSource = _allExcursions.Select(e => e.Data.GetValueOrDefault("Name", "Névtelen")).ToList();
-            }
+                _excursionComboBox.ItemsSource =
+                    _allExcursions.Select(e => e.Data.GetValueOrDefault("Name", "Névtelen")).ToList();
 
             _classStudents = _context.GetMyClassStudents();
-            if (_studentListBox != null)
-            {
-                _studentListBox.ItemsSource = _classStudents.Select(s => s.Name).ToList();
-            }
+            if (_studentListBox != null) _studentListBox.ItemsSource = _classStudents.Select(s => s.Name).ToList();
             SetStatus("Adatok betöltve.");
         }
         catch (Exception ex)
@@ -130,7 +129,7 @@ public class ExcursionPaymentTrackingView : IEvolView
         _allPayments = _context?.QueryEntities(PaymentEntityType)
             .Where(p => p.Data.GetValueOrDefault("ExcursionId") == _selectedExcursion.Id.ToString())
             .ToList();
-        
+
         UpdateDetailsPanel();
         SetStatus($"Kiválasztott kirándulás: {_selectedExcursion.Data.GetValueOrDefault("Name")}");
     }
@@ -154,35 +153,31 @@ public class ExcursionPaymentTrackingView : IEvolView
             if (_detailsPanel != null) _detailsPanel.IsVisible = false;
             return;
         }
-        
+
         _detailsPanel.IsVisible = true;
-        
-        if (_studentNameTextBlock != null)
-        {
-            _studentNameTextBlock.Text = _selectedStudent.Name;
-        }
-        
+
+        if (_studentNameTextBlock != null) _studentNameTextBlock.Text = _selectedStudent.Name;
+
         if (_paymentInfoTextBlock != null && _amountTextBox != null)
         {
             _amountTextBox.Text = string.Empty;
 
-            var paymentRecord = _allPayments?.FirstOrDefault(p => p.Data.GetValueOrDefault("StudentId") == _selectedStudent.Id.ToString());
-            decimal.TryParse(_selectedExcursion.Data.GetValueOrDefault("TotalCost", "0"), NumberStyles.Any, CultureInfo.InvariantCulture, out var totalCost);
-            decimal.TryParse(paymentRecord?.Data.GetValueOrDefault("AmountPaid", "0"), NumberStyles.Any, CultureInfo.InvariantCulture, out var amountPaid);
+            var paymentRecord = _allPayments?.FirstOrDefault(p =>
+                p.Data.GetValueOrDefault("StudentId") == _selectedStudent.Id.ToString());
+            decimal.TryParse(_selectedExcursion.Data.GetValueOrDefault("TotalCost", "0"), NumberStyles.Any,
+                CultureInfo.InvariantCulture, out var totalCost);
+            decimal.TryParse(paymentRecord?.Data.GetValueOrDefault("AmountPaid", "0"), NumberStyles.Any,
+                CultureInfo.InvariantCulture, out var amountPaid);
 
             var remaining = totalCost - amountPaid;
             _paymentInfoTextBlock.Text = $"Teljes költség: {totalCost:C}\n" +
-                                       $"Befizetve: {amountPaid:C}\n" +
-                                       $"Hátralék: {remaining:C}";
-                                       
+                                         $"Befizetve: {amountPaid:C}\n" +
+                                         $"Hátralék: {remaining:C}";
+
             if (remaining <= 0)
-            {
                 _paymentInfoTextBlock.Foreground = Brushes.Green;
-            }
             else
-            {
                 _paymentInfoTextBlock.Foreground = Brushes.OrangeRed;
-            }
         }
     }
 
@@ -194,7 +189,8 @@ public class ExcursionPaymentTrackingView : IEvolView
             return;
         }
 
-        if (!decimal.TryParse(_amountTextBox.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out var newPaymentAmount) || newPaymentAmount <= 0)
+        if (!decimal.TryParse(_amountTextBox.Text, NumberStyles.Any, CultureInfo.InvariantCulture,
+                out var newPaymentAmount) || newPaymentAmount <= 0)
         {
             SetStatus("Érvénytelen összeg.", true);
             return;
@@ -202,9 +198,11 @@ public class ExcursionPaymentTrackingView : IEvolView
 
         try
         {
-            var paymentRecord = _allPayments?.FirstOrDefault(p => p.Data.GetValueOrDefault("StudentId") == _selectedStudent.Id.ToString());
-            
-            decimal.TryParse(paymentRecord?.Data.GetValueOrDefault("AmountPaid", "0"), NumberStyles.Any, CultureInfo.InvariantCulture, out var currentAmountPaid);
+            var paymentRecord = _allPayments?.FirstOrDefault(p =>
+                p.Data.GetValueOrDefault("StudentId") == _selectedStudent.Id.ToString());
+
+            decimal.TryParse(paymentRecord?.Data.GetValueOrDefault("AmountPaid", "0"), NumberStyles.Any,
+                CultureInfo.InvariantCulture, out var currentAmountPaid);
             var totalPaid = currentAmountPaid + newPaymentAmount;
 
             var data = new Dictionary<string, string>
@@ -215,10 +213,10 @@ public class ExcursionPaymentTrackingView : IEvolView
                 { "AmountPaid", totalPaid.ToString(CultureInfo.InvariantCulture) }
             };
 
-            int recordId = paymentRecord?.Id ?? 0;
+            var recordId = paymentRecord?.Id ?? 0;
             _context.SaveEntity(PaymentEntityType, data, recordId == 0 ? null : recordId);
 
-            SetStatus("Befizetés sikeresen rögzítve.", false);
+            SetStatus("Befizetés sikeresen rögzítve.");
 
             _allPayments = _context.QueryEntities(PaymentEntityType)
                 .Where(p => p.Data.GetValueOrDefault("ExcursionId") == _selectedExcursion.Id.ToString())

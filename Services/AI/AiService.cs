@@ -5,22 +5,23 @@ using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using DotNetEnv;
 using Kreta.Core;
 
 namespace Kreta.Services.AI;
 
 /// <summary>
-/// Service performing Gemini API connection, Formal Prompt Refiner pre-filtering, Prompt-to-Code Conformance verification,
-/// context analysis of existing views, and C# UI code generation.
+///     Service performing Gemini API connection, Formal Prompt Refiner pre-filtering, Prompt-to-Code Conformance
+///     verification,
+///     context analysis of existing views, and C# UI code generation.
 /// </summary>
 public class AiService : IAiService
 {
-    private readonly HttpClient _httpClient;
-    private readonly IPromptRefinerService _promptRefiner;
-    private readonly IPromptConformanceVerifier _conformanceVerifier;
-
     private static string? _preferredVersion;
     private static string? _preferredModel;
+    private readonly IPromptConformanceVerifier _conformanceVerifier;
+    private readonly HttpClient _httpClient;
+    private readonly IPromptRefinerService _promptRefiner;
 
     public AiService()
     {
@@ -30,7 +31,7 @@ public class AiService : IAiService
 
         try
         {
-            DotNetEnv.Env.Load();
+            Env.Load();
         }
         catch
         {
@@ -38,30 +39,9 @@ public class AiService : IAiService
         }
     }
 
-    private string GetApiKey()
-    {
-        var key = Environment.GetEnvironmentVariable("GEMINI_API_KEY")
-                  ?? Environment.GetEnvironmentVariable("GOOGLE_API_KEY");
-
-        if (string.IsNullOrEmpty(key))
-        {
-            try
-            {
-                key = DotNetEnv.Env.GetString("GEMINI_API_KEY")
-                      ?? DotNetEnv.Env.GetString("GOOGLE_API_KEY");
-            }
-            catch
-            {
-                // DotNetEnv not configured
-            }
-        }
-
-        return key ?? string.Empty;
-    }
-
     public async Task<string> GenerateFeatureAsync(string prompt)
     {
-        var response = await GenerateFeatureAsync(prompt, Role.Student, null);
+        var response = await GenerateFeatureAsync(prompt, Role.Student);
         return response.SourceCode ?? string.Empty;
     }
 
@@ -70,11 +50,9 @@ public class AiService : IAiService
     {
         var apiKey = GetApiKey();
         if (string.IsNullOrWhiteSpace(apiKey))
-        {
             throw new Exception(
                 "Nem található Gemini API kulcs! Kérjük, futtassa az alkalmazást beállított környezeti változóval:\n" +
                 "export GEMINI_API_KEY=\"a_te_kulcsod_itt\" && dotnet run");
-        }
 
         // STEP 1: Formal Prompt Refiner preprocessing
         var formalSpec = await _promptRefiner.RefinePromptAsync(prompt, role, apiKey);
@@ -103,38 +81,27 @@ public class AiService : IAiService
         var fallbackMatrix = new List<dynamic>();
 
         if (!string.IsNullOrEmpty(_preferredVersion) && !string.IsNullOrEmpty(_preferredModel))
-        {
             fallbackMatrix.Add(new { Version = _preferredVersion, Model = _preferredModel });
-        }
 
         foreach (var item in defaultMatrix)
-        {
             if (item.Version != _preferredVersion || item.Model != _preferredModel)
-            {
                 fallbackMatrix.Add(item);
-            }
-        }
 
         Exception? lastException = null;
 
         foreach (var attempt in fallbackMatrix)
         {
-            int maxRetries = 3;
-            int delayMs = 1000;
+            var maxRetries = 3;
+            var delayMs = 1000;
 
-            for (int retry = 0; retry < maxRetries; retry++)
-            {
+            for (var retry = 0; retry < maxRetries; retry++)
                 try
                 {
                     if (retry > 0)
-                    {
                         Console.WriteLine(
                             $"[AI Kapcsolat] Újrapróbálkozás ({retry}/{maxRetries - 1}) {attempt.Version} - {attempt.Model}...");
-                    }
                     else
-                    {
                         Console.WriteLine($"[AI Kapcsolat] Megkísérlés: {attempt.Version} - {attempt.Model}...");
-                    }
 
                     var response = await CallGeminiApiInternalAsync(prompt, role, formalSpec, history, apiKey,
                         (string)attempt.Version, (string)attempt.Model, targetViewFilePath);
@@ -147,9 +114,7 @@ public class AiService : IAiService
                     // STEP 3: Prompt-to-Code Conformance Verification (AST-based)
                     if (!string.IsNullOrEmpty(response.SourceCode) && response.Action != "DELETE" &&
                         response.Action != "REJECT")
-                    {
                         _conformanceVerifier.VerifyConformance(response.SourceCode, formalSpec);
-                    }
 
                     return response;
                 }
@@ -160,15 +125,10 @@ public class AiService : IAiService
                         $"[AI Kapcsolat - Próbálkozás sikertelen ({attempt.Version}/{attempt.Model})]: {ex.Message}");
 
                     if (ex.Message.Contains("403") || ex.Message.Contains("API_KEY_INVALID"))
-                    {
                         throw new Exception(
                             $"Érvénytelen Gemini API kulcs! Ellenőrizze a beállításokat. Részletek: {ex.Message}");
-                    }
 
-                    if (ex.Message.Contains("404") || ex.Message.Contains("400"))
-                    {
-                        break;
-                    }
+                    if (ex.Message.Contains("404") || ex.Message.Contains("400")) break;
 
                     if (retry < maxRetries - 1 && (ex.Message.Contains("503") || ex.Message.Contains("429") ||
                                                    ex.Message.Contains("Hálózati hiba") ||
@@ -184,11 +144,29 @@ public class AiService : IAiService
                         break;
                     }
                 }
-            }
         }
 
         throw new Exception(
             $"Nem sikerült elérni a Gemini API-t egyik konfigurációval sem. Legutolsó hiba:\n{lastException?.Message}");
+    }
+
+    private string GetApiKey()
+    {
+        var key = Environment.GetEnvironmentVariable("GEMINI_API_KEY")
+                  ?? Environment.GetEnvironmentVariable("GOOGLE_API_KEY");
+
+        if (string.IsNullOrEmpty(key))
+            try
+            {
+                key = Env.GetString("GEMINI_API_KEY")
+                      ?? Env.GetString("GOOGLE_API_KEY");
+            }
+            catch
+            {
+                // DotNetEnv not configured
+            }
+
+        return key ?? string.Empty;
     }
 
     private string GetExistingViewsContext()
@@ -209,13 +187,9 @@ public class AiService : IAiService
                 var content = File.ReadAllText(file);
                 sb.AppendLine($"- Fájl: {fileName}");
                 if (content.Length > 800)
-                {
                     sb.AppendLine($"  Kód részlet: {content.Substring(0, 800)}...\n");
-                }
                 else
-                {
                     sb.AppendLine($"  Kód: {content}\n");
-                }
             }
 
             return sb.ToString();
@@ -227,19 +201,16 @@ public class AiService : IAiService
     }
 
     /// <summary>
-    /// If the user SELECTED an already existing, previously generated view on the UI (e.g. clicked
-    /// on "Grade Calculator" in the sidebar), and then asks for a modification, this method is called
-    /// to inject its ENTIRE (untruncated) source code into the system prompt, with a clear MODIFY
-    /// instruction. This replaces the previous, unreliable behavior where the model had to GUESS
-    /// (based on name, from free text) which of the truncated code views listed by
-    /// GetExistingViewsContext() the user wanted to modify.
+    ///     If the user SELECTED an already existing, previously generated view on the UI (e.g. clicked
+    ///     on "Grade Calculator" in the sidebar), and then asks for a modification, this method is called
+    ///     to inject its ENTIRE (untruncated) source code into the system prompt, with a clear MODIFY
+    ///     instruction. This replaces the previous, unreliable behavior where the model had to GUESS
+    ///     (based on name, from free text) which of the truncated code views listed by
+    ///     GetExistingViewsContext() the user wanted to modify.
     /// </summary>
     private string GetTargetViewContext(string? targetViewFilePath)
     {
-        if (string.IsNullOrWhiteSpace(targetViewFilePath) || !File.Exists(targetViewFilePath))
-        {
-            return string.Empty;
-        }
+        if (string.IsNullOrWhiteSpace(targetViewFilePath) || !File.Exists(targetViewFilePath)) return string.Empty;
 
         try
         {
@@ -275,12 +246,14 @@ Ha a kérés ennek a nézetnek a javítására, módosítására, bővítésére
         FormalPromptSpecification spec, string? history, string apiKey, string apiVersion, string modelName,
         string? targetViewFilePath = null)
     {
-        var url = $"https://generativelanguage.googleapis.com/{apiVersion}/models/{modelName}:generateContent?key={apiKey}";
+        var url =
+            $"https://generativelanguage.googleapis.com/{apiVersion}/models/{modelName}:generateContent?key={apiKey}";
 
         var existingViewsContext = GetExistingViewsContext();
         var targetViewContext = GetTargetViewContext(targetViewFilePath);
 
-        var systemInstruction = $@"You are the automated C# and Avalonia UI compiler-agent for ""EvolKréta"", a self-evolving educational system.
+        var systemInstruction =
+            $@"You are the automated C# and Avalonia UI compiler-agent for ""EvolKréta"", a self-evolving educational system.
 Your objective is to generate, MODIFY, or DELETE safe, compile-safe, and strictly role-appropriate C# code for dynamic views.
 
 ACTIVE USER ROLE: {role}
@@ -402,7 +375,12 @@ Ez alapján generálj EGY EGYSZERŰBB, RÖVIDEBB C# kódot, ami ezt kiküszöbli
                 new
                 {
                     parts = new[]
-                        { new { text = $"Role: {role}. Normalized Spec: {spec.NormalizedIntent}. Original Prompt: {prompt}" } }
+                    {
+                        new
+                        {
+                            text = $"Role: {role}. Normalized Spec: {spec.NormalizedIntent}. Original Prompt: {prompt}"
+                        }
+                    }
                 }
             },
             systemInstruction = new
@@ -460,7 +438,7 @@ Ez alapján generálj EGY EGYSZERŰBB, RÖVIDEBB C# kódot, ami ezt kiküszöbli
             using var doc = JsonDocument.Parse(responseString);
             var candidate = doc.RootElement.GetProperty("candidates")[0];
 
-            string? finishReason = candidate.TryGetProperty("finishReason", out var fr) ? fr.GetString() : null;
+            var finishReason = candidate.TryGetProperty("finishReason", out var fr) ? fr.GetString() : null;
 
             // FIX: For MAX_TOKENS (when response cuts off during thinking phase),
             // the "content" object has no "parts" field - using TryGetProperty safely handles this
@@ -471,21 +449,17 @@ Ez alapján generálj EGY EGYSZERŰBB, RÖVIDEBB C# kódot, ami ezt kiküszöbli
                 partsElement.ValueKind == JsonValueKind.Array &&
                 partsElement.GetArrayLength() > 0 &&
                 partsElement[0].TryGetProperty("text", out var textEl))
-            {
                 responseText = textEl.GetString();
-            }
 
             if (string.IsNullOrEmpty(responseText))
             {
                 if (finishReason == "MAX_TOKENS")
-                {
                     // Message INTENTIONALLY contains "MAX_TOKENS" so caller's GenerateFeatureAsync
                     // retry logic knows whether to attempt a retry (requesting shorter code)
                     // instead of giving up immediately.
                     throw new Exception(
                         "A modell válasza megszakadt, mielőtt befejezte volna a kódot (finishReason: MAX_TOKENS). " +
                         "Kérj egy egyszerűbb / kisebb funkciót, vagy próbáld újra.");
-                }
 
                 throw new Exception($"Az AI üres választ adott vissza (finishReason: {finishReason ?? "ismeretlen"}).");
             }
@@ -494,10 +468,7 @@ Ez alapján generálj EGY EGYSZERŰBB, RÖVIDEBB C# kódot, ami ezt kiküszöbli
             if (cleanedJson.StartsWith("```json"))
             {
                 cleanedJson = cleanedJson.Substring(7);
-                if (cleanedJson.EndsWith("```"))
-                {
-                    cleanedJson = cleanedJson.Substring(0, cleanedJson.Length - 3);
-                }
+                if (cleanedJson.EndsWith("```")) cleanedJson = cleanedJson.Substring(0, cleanedJson.Length - 3);
             }
 
             cleanedJson = cleanedJson.Trim();
@@ -526,9 +497,7 @@ Ez alapján generálj EGY EGYSZERŰBB, RÖVIDEBB C# kódot, ami ezt kiküszöbli
             }) ?? throw new Exception("Nem sikerült deszerializálni a generált választ.");
 
             if (!string.IsNullOrEmpty(result.SourceCode))
-            {
                 result.SourceCode = result.SourceCode.Replace("\r\n", "\n").Replace("\r", "\n");
-            }
 
             return result;
         }

@@ -4,40 +4,43 @@ using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using Avalonia.Layout;
 using Avalonia.Media;
-using Kreta.Core;
 using Kreta.Contexts;
+using Kreta.Core;
 
 public class TeremAtrendezesView : IEvolView
 {
-    private IDirectorContext? _context;
+    private const string EntityType = "ClassroomState";
+    private readonly IDirectorContext? _context;
+    private TextBox? _capacityTextBox;
 
     private ListBox? _classroomListBox;
-    private StackPanel? _editPanel;
-    private TextBlock? _statusTextBlock;
-
-    private TextBox? _nameTextBox;
-    private TextBox? _capacityTextBox;
-    private TextBox? _layoutTextBox;
-    private TextBox? _equipmentTextBox;
-    private ComboBox? _statusComboBox;
-    private Button? _saveButton;
-    private Button? _newButton;
 
     private List<GenericRecord>? _classrooms;
+    private StackPanel? _editPanel;
+    private TextBox? _equipmentTextBox;
+    private TextBox? _layoutTextBox;
+
+    private TextBox? _nameTextBox;
+    private Button? _newButton;
+    private Button? _saveButton;
     private GenericRecord? _selectedClassroom;
-    private const string EntityType = "ClassroomState";
+    private ComboBox? _statusComboBox;
+    private TextBlock? _statusTextBlock;
 
-    public new string Name => "Terem Állapot Kezelő";
-    public string Description => "Tantermek állapotának, berendezésének és felszereltségének nyilvántartására és módosítására szolgáló felület.";
-
-    public TeremAtrendezesView() { }
+    public TeremAtrendezesView()
+    {
+    }
 
     public TeremAtrendezesView(IDirectorContext context)
     {
         _context = context;
     }
+
+    public new string Name => "Terem Állapot Kezelő";
+
+    public string Description =>
+        "Tantermek állapotának, berendezésének és felszereltségének nyilvántartására és módosítására szolgáló felület.";
 
     public Control CreateView()
     {
@@ -62,7 +65,8 @@ public class TeremAtrendezesView : IEvolView
             IsEnabled = false
         };
 
-        _statusTextBlock = new TextBlock { Text = "Válasszon egy termet a listából vagy hozzon létre újat.", FontWeight = FontWeight.Bold };
+        _statusTextBlock = new TextBlock
+            { Text = "Válasszon egy termet a listából vagy hozzon létre újat.", FontWeight = FontWeight.Bold };
 
         _newButton = new Button { Content = "Új terem" };
         _newButton.Click += NewButton_Click;
@@ -71,7 +75,7 @@ public class TeremAtrendezesView : IEvolView
         _capacityTextBox = new TextBox { PlaceholderText = "Kapacitás (férőhely)" };
         _layoutTextBox = new TextBox { PlaceholderText = "Berendezés leírása (pl. Csoportos)" };
         _equipmentTextBox = new TextBox { PlaceholderText = "Felszereltség (vesszővel elválasztva)" };
-        
+
         _statusComboBox = new ComboBox
         {
             PlaceholderText = "Állapot",
@@ -116,8 +120,10 @@ public class TeremAtrendezesView : IEvolView
         if (_context == null || _classroomListBox == null) return;
         try
         {
-            _classrooms = _context.QueryEntities(EntityType).OrderBy(r => r.Data.GetValueOrDefault("Name", "N/A")).ToList();
-            _classroomListBox.ItemsSource = _classrooms.Select(r => r.Data.GetValueOrDefault("Name", "Ismeretlen terem")).ToList();
+            _classrooms = _context.QueryEntities(EntityType).OrderBy(r => r.Data.GetValueOrDefault("Name", "N/A"))
+                .ToList();
+            _classroomListBox.ItemsSource =
+                _classrooms.Select(r => r.Data.GetValueOrDefault("Name", "Ismeretlen terem")).ToList();
             ClearAndDisableEditPanel();
         }
         catch (Exception ex)
@@ -144,12 +150,15 @@ public class TeremAtrendezesView : IEvolView
         if (_editPanel == null || _selectedClassroom == null) return;
 
         _editPanel.IsEnabled = true;
-        if (_statusTextBlock != null) _statusTextBlock.Text = $"Szerkesztés: {_selectedClassroom.Data.GetValueOrDefault("Name", "")}";
+        if (_statusTextBlock != null)
+            _statusTextBlock.Text = $"Szerkesztés: {_selectedClassroom.Data.GetValueOrDefault("Name", "")}";
         if (_nameTextBox != null) _nameTextBox.Text = _selectedClassroom.Data.GetValueOrDefault("Name", "");
         if (_capacityTextBox != null) _capacityTextBox.Text = _selectedClassroom.Data.GetValueOrDefault("Capacity", "");
         if (_layoutTextBox != null) _layoutTextBox.Text = _selectedClassroom.Data.GetValueOrDefault("Layout", "");
-        if (_equipmentTextBox != null) _equipmentTextBox.Text = _selectedClassroom.Data.GetValueOrDefault("Equipment", "");
-        if (_statusComboBox != null) _statusComboBox.SelectedItem = _selectedClassroom.Data.GetValueOrDefault("Status", null);
+        if (_equipmentTextBox != null)
+            _equipmentTextBox.Text = _selectedClassroom.Data.GetValueOrDefault("Equipment", "");
+        if (_statusComboBox != null)
+            _statusComboBox.SelectedItem = _selectedClassroom.Data.GetValueOrDefault("Status", null);
     }
 
     private void ClearAndDisableEditPanel()
@@ -180,7 +189,8 @@ public class TeremAtrendezesView : IEvolView
 
     private void SaveButton_Click(object? sender, RoutedEventArgs e)
     {
-        if (_context == null || _statusTextBlock == null || _nameTextBox == null || string.IsNullOrWhiteSpace(_nameTextBox.Text))
+        if (_context == null || _statusTextBlock == null || _nameTextBox == null ||
+            string.IsNullOrWhiteSpace(_nameTextBox.Text))
         {
             if (_statusTextBlock != null) _statusTextBlock.Text = "Hiba: A terem neve kötelező.";
             return;
@@ -197,7 +207,7 @@ public class TeremAtrendezesView : IEvolView
 
         try
         {
-            int? idToSave = _selectedClassroom?.Id;
+            var idToSave = _selectedClassroom?.Id;
             _context.SaveEntity(EntityType, data, idToSave);
             _statusTextBlock.Text = "Mentés sikeres!";
             LoadClassrooms();

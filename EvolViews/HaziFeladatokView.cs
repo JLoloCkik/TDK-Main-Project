@@ -1,31 +1,31 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
-using Avalonia.Media;
-using Kreta.Core;
 using Kreta.Contexts;
-using System.Globalization;
+using Kreta.Core;
 
 public class HaziFeladatokView : IEvolView
 {
-    private IStudentContext? _context;
-    private ComboBox? _subjectComboBox;
-    private ListBox? _homeworkListBox;
-    private TextBlock? _statusTextBlock;
-    private List<GenericRecord>? _myHomework;
     private const string HomeworkEntityType = "Homework";
+    private readonly IStudentContext? _context;
+    private ListBox? _homeworkListBox;
+    private List<GenericRecord>? _myHomework;
+    private TextBlock? _statusTextBlock;
+    private ComboBox? _subjectComboBox;
 
-    public new string Name => "Házi Feladatok";
-    public string Description => "A diák házi feladatainak listázása tantárgyi szűrési lehetőséggel.";
-
-    public HaziFeladatokView() { }
+    public HaziFeladatokView()
+    {
+    }
 
     public HaziFeladatokView(IStudentContext context)
     {
         _context = context;
     }
+
+    public new string Name => "Házi Feladatok";
+    public string Description => "A diák házi feladatainak listázása tantárgyi szűrési lehetőséggel.";
 
     public Control CreateView()
     {
@@ -33,14 +33,14 @@ public class HaziFeladatokView : IEvolView
         {
             Orientation = Orientation.Vertical,
             Spacing = 10,
-            Margin = new Avalonia.Thickness(15)
+            Margin = new Thickness(15)
         };
 
         _statusTextBlock = new TextBlock
         {
             Text = "Adatok betöltése...",
             HorizontalAlignment = HorizontalAlignment.Center,
-            Margin = new Avalonia.Thickness(0, 10)
+            Margin = new Thickness(0, 10)
         };
 
         _subjectComboBox = new ComboBox
@@ -121,9 +121,9 @@ public class HaziFeladatokView : IEvolView
             .Distinct()
             .OrderBy(s => s)
             .ToList();
-        
+
         subjects.Insert(0, "Minden tantárgy");
-        
+
         _subjectComboBox.ItemsSource = subjects;
         _subjectComboBox.SelectedIndex = 0;
         _subjectComboBox.IsEnabled = true;
@@ -136,18 +136,19 @@ public class HaziFeladatokView : IEvolView
 
     private void UpdateDisplay()
     {
-        if (_myHomework == null || _subjectComboBox == null || _homeworkListBox == null || _statusTextBlock == null) return;
+        if (_myHomework == null || _subjectComboBox == null || _homeworkListBox == null ||
+            _statusTextBlock == null) return;
 
         var selectedSubject = _subjectComboBox.SelectedItem as string;
 
         IEnumerable<GenericRecord> filteredHomework = _myHomework;
 
         if (selectedSubject != null && selectedSubject != "Minden tantárgy")
-        {
-            filteredHomework = _myHomework.Where(h => h.Data.ContainsKey("SubjectName") && h.Data["SubjectName"] == selectedSubject);
-        }
+            filteredHomework = _myHomework.Where(h =>
+                h.Data.ContainsKey("SubjectName") && h.Data["SubjectName"] == selectedSubject);
 
-        var displayItems = filteredHomework.Select(h => {
+        var displayItems = filteredHomework.Select(h =>
+        {
             var subject = h.Data.GetValueOrDefault("SubjectName", "N/A");
             var dueDate = h.Data.GetValueOrDefault("DueDate", "N/A");
             var description = h.Data.GetValueOrDefault("Description", "Nincs leírás.");

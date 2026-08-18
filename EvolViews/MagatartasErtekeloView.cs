@@ -1,48 +1,60 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
-using Kreta.Core;
 using Kreta.Contexts;
-using System.Globalization;
+using Kreta.Core;
 
 public class MagatartasErtekeloView : IEvolView
 {
-    private ITeacherContext? _context;
+    private const string EntityType = "BehavioralNote";
+    private readonly ITeacherContext? _context;
+
+    private List<User>? _allStudents;
     private ComboBox? _classComboBox;
-    private ComboBox? _studentComboBox;
-    private ComboBox? _typeComboBox;
+    private List<string>? _classNames;
     private DatePicker? _datePicker;
     private TextBox? _descriptionTextBox;
     private Button? _saveButton;
     private TextBlock? _statusTextBlock;
+    private ComboBox? _studentComboBox;
+    private ComboBox? _typeComboBox;
 
-    private List<User>? _allStudents;
-    private List<string>? _classNames;
-    private const string EntityType = "BehavioralNote";
-
-    public new string Name => "Magatartási Értékelő";
-    public string Description => "Dicséret vagy figyelmeztetés rögzítése egy diák számára.";
-
-    public MagatartasErtekeloView() { }
+    public MagatartasErtekeloView()
+    {
+    }
 
     public MagatartasErtekeloView(ITeacherContext context)
     {
         _context = context;
     }
 
+    public new string Name => "Magatartási Értékelő";
+    public string Description => "Dicséret vagy figyelmeztetés rögzítése egy diák számára.";
+
     public Control CreateView()
     {
-        _classComboBox = new ComboBox { PlaceholderText = "Válassz osztályt...", HorizontalAlignment = HorizontalAlignment.Stretch };
-        _studentComboBox = new ComboBox { PlaceholderText = "Válassz diákot...", HorizontalAlignment = HorizontalAlignment.Stretch, IsEnabled = false };
-        _typeComboBox = new ComboBox { PlaceholderText = "Válassz típust...", HorizontalAlignment = HorizontalAlignment.Stretch };
+        _classComboBox = new ComboBox
+            { PlaceholderText = "Válassz osztályt...", HorizontalAlignment = HorizontalAlignment.Stretch };
+        _studentComboBox = new ComboBox
+        {
+            PlaceholderText = "Válassz diákot...", HorizontalAlignment = HorizontalAlignment.Stretch, IsEnabled = false
+        };
+        _typeComboBox = new ComboBox
+            { PlaceholderText = "Válassz típust...", HorizontalAlignment = HorizontalAlignment.Stretch };
         _typeComboBox.ItemsSource = new List<string> { "Dicséret", "Figyelmeztetés" };
-        _datePicker = new DatePicker { SelectedDate = DateTime.Today, HorizontalAlignment = HorizontalAlignment.Stretch };
-        _descriptionTextBox = new TextBox { PlaceholderText = "Értékelés szövege...", MinHeight = 80, TextWrapping = TextWrapping.Wrap, AcceptsReturn = true, HorizontalAlignment = HorizontalAlignment.Stretch };
+        _datePicker = new DatePicker
+            { SelectedDate = DateTime.Today, HorizontalAlignment = HorizontalAlignment.Stretch };
+        _descriptionTextBox = new TextBox
+        {
+            PlaceholderText = "Értékelés szövege...", MinHeight = 80, TextWrapping = TextWrapping.Wrap,
+            AcceptsReturn = true, HorizontalAlignment = HorizontalAlignment.Stretch
+        };
         _saveButton = new Button { Content = "Mentés", HorizontalAlignment = HorizontalAlignment.Stretch };
         _statusTextBlock = new TextBlock { Text = "", Margin = new Thickness(0, 10, 0, 0) };
 
@@ -53,7 +65,11 @@ public class MagatartasErtekeloView : IEvolView
             Margin = new Thickness(20)
         };
 
-        mainPanel.Children.Add(new TextBlock { Text = "Magatartási Értékelés Rögzítése", FontSize = 18, FontWeight = FontWeight.Bold, Margin = new Thickness(0,0,0,10) });
+        mainPanel.Children.Add(new TextBlock
+        {
+            Text = "Magatartási Értékelés Rögzítése", FontSize = 18, FontWeight = FontWeight.Bold,
+            Margin = new Thickness(0, 0, 0, 10)
+        });
         mainPanel.Children.Add(new TextBlock { Text = "Osztály:" });
         mainPanel.Children.Add(_classComboBox);
         mainPanel.Children.Add(new TextBlock { Text = "Diák:" });
@@ -87,10 +103,7 @@ public class MagatartasErtekeloView : IEvolView
         if (_allStudents != null && _allStudents.Any())
         {
             _classNames = _allStudents.Select(s => s.ClassName).Distinct().OrderBy(cn => cn).ToList();
-            if (_classComboBox != null)
-            {
-                _classComboBox.ItemsSource = _classNames;
-            }
+            if (_classComboBox != null) _classComboBox.ItemsSource = _classNames;
         }
         else
         {
@@ -101,14 +114,15 @@ public class MagatartasErtekeloView : IEvolView
 
     private void OnClassSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (_studentComboBox == null || _allStudents == null || _classComboBox == null || _classComboBox.SelectedItem == null) return;
-        
-        string selectedClass = _classComboBox.SelectedItem.ToString() ?? "";
+        if (_studentComboBox == null || _allStudents == null || _classComboBox == null ||
+            _classComboBox.SelectedItem == null) return;
+
+        var selectedClass = _classComboBox.SelectedItem.ToString() ?? "";
         var studentsInClass = _allStudents
             .Where(s => s.ClassName == selectedClass)
             .OrderBy(s => s.Name)
             .ToList();
-        
+
         _studentComboBox.ItemsSource = studentsInClass.Select(s => s.Name).ToList();
         _studentComboBox.IsEnabled = studentsInClass.Any();
         _studentComboBox.SelectedIndex = -1;
@@ -121,9 +135,12 @@ public class MagatartasErtekeloView : IEvolView
 
     private void SaveAssessment()
     {
-        if (_context == null || _classComboBox == null || _studentComboBox == null || _typeComboBox == null || _datePicker == null || _descriptionTextBox == null) return;
+        if (_context == null || _classComboBox == null || _studentComboBox == null || _typeComboBox == null ||
+            _datePicker == null || _descriptionTextBox == null) return;
 
-        if (_classComboBox.SelectedItem == null || _studentComboBox.SelectedItem == null || _typeComboBox.SelectedItem == null || string.IsNullOrWhiteSpace(_descriptionTextBox.Text) || _datePicker.SelectedDate == null)
+        if (_classComboBox.SelectedItem == null || _studentComboBox.SelectedItem == null ||
+            _typeComboBox.SelectedItem == null || string.IsNullOrWhiteSpace(_descriptionTextBox.Text) ||
+            _datePicker.SelectedDate == null)
         {
             SetStatus("Hiba: Minden mező kitöltése kötelező!", true);
             return;
@@ -131,7 +148,8 @@ public class MagatartasErtekeloView : IEvolView
 
         var selectedClassName = _classComboBox.SelectedItem.ToString();
         var selectedStudentName = _studentComboBox.SelectedItem.ToString();
-        var selectedStudent = _allStudents?.FirstOrDefault(s => s.ClassName == selectedClassName && s.Name == selectedStudentName);
+        var selectedStudent =
+            _allStudents?.FirstOrDefault(s => s.ClassName == selectedClassName && s.Name == selectedStudentName);
 
         if (selectedStudent == null)
         {
@@ -176,6 +194,7 @@ public class MagatartasErtekeloView : IEvolView
             _studentComboBox.ItemsSource = null;
             _studentComboBox.IsEnabled = false;
         }
+
         if (_typeComboBox != null) _typeComboBox.SelectedIndex = -1;
         if (_datePicker != null) _datePicker.SelectedDate = DateTime.Today;
         if (_descriptionTextBox != null) _descriptionTextBox.Text = "";

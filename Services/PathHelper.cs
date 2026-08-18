@@ -13,9 +13,7 @@ public static class PathHelper
         {
             var csprojFiles = currentDir.GetFiles("*.csproj");
             if (csprojFiles.Length > 0 || Directory.Exists(Path.Combine(currentDir.FullName, ".git")))
-            {
                 return currentDir.FullName;
-            }
             currentDir = currentDir.Parent;
         }
 
@@ -27,10 +25,7 @@ public static class PathHelper
         var projectRoot = GetProjectRootDirectory();
         var evolViewsDir = Path.Combine(projectRoot, "EvolViews");
 
-        if (!Directory.Exists(evolViewsDir))
-        {
-            Directory.CreateDirectory(evolViewsDir);
-        }
+        if (!Directory.Exists(evolViewsDir)) Directory.CreateDirectory(evolViewsDir);
 
         return evolViewsDir;
     }

@@ -1,39 +1,42 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
-using Kreta.Core;
 using Kreta.Contexts;
+using Kreta.Core;
 
 public class IskolabuszMenetrendView : IEvolView
 {
-    private IStudentContext? _context;
+    private const string EntityType = "SchoolBusSchedule";
+    private readonly IStudentContext? _context;
     private ListBox? _scheduleListBox;
     private TextBlock? _statusTextBlock;
-    private const string EntityType = "SchoolBusSchedule";
 
-    public new string Name => "Iskolabusz Menetrend";
-    public string Description => "Az iskolabuszok járatainak és megállóinak megtekintése.";
-
-    public IskolabuszMenetrendView() { }
+    public IskolabuszMenetrendView()
+    {
+    }
 
     public IskolabuszMenetrendView(IStudentContext context)
     {
         _context = context;
     }
 
+    public new string Name => "Iskolabusz Menetrend";
+    public string Description => "Az iskolabuszok járatainak és megállóinak megtekintése.";
+
     public Control CreateView()
     {
         _scheduleListBox = new ListBox
         {
-            Margin = new Avalonia.Thickness(10)
+            Margin = new Thickness(10)
         };
 
         _statusTextBlock = new TextBlock
         {
-            Margin = new Avalonia.Thickness(10),
+            Margin = new Thickness(10),
             HorizontalAlignment = HorizontalAlignment.Center
         };
 
@@ -49,7 +52,7 @@ public class IskolabuszMenetrendView : IEvolView
                     FontSize = 20,
                     FontWeight = FontWeight.Bold,
                     HorizontalAlignment = HorizontalAlignment.Center,
-                    Margin = new Avalonia.Thickness(0, 10)
+                    Margin = new Thickness(0, 10)
                 },
                 _statusTextBlock,
                 _scheduleListBox
@@ -87,9 +90,9 @@ public class IskolabuszMenetrendView : IEvolView
                 .ThenBy(r => r.Data.GetValueOrDefault("Time", string.Empty))
                 .Select(record =>
                 {
-                    string route = record.Data.GetValueOrDefault("Route", "Ismeretlen járat");
-                    string time = record.Data.GetValueOrDefault("Time", "--:--");
-                    string stop = record.Data.GetValueOrDefault("Stop", "Ismeretlen megálló");
+                    var route = record.Data.GetValueOrDefault("Route", "Ismeretlen járat");
+                    var time = record.Data.GetValueOrDefault("Time", "--:--");
+                    var stop = record.Data.GetValueOrDefault("Stop", "Ismeretlen megálló");
                     return $"[{time}] {route} járat - {stop}";
                 })
                 .ToList();

@@ -1,28 +1,31 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
-using Kreta.Core;
 using Kreta.Contexts;
+using Kreta.Core;
 
 public class TalaltTargyakView : IEvolView
 {
-    private IStudentContext? _context;
+    private const string EntityType = "LostAndFoundItem";
+    private readonly IStudentContext? _context;
     private ListBox? _itemsListBox;
     private TextBlock? _statusTextBlock;
-    private const string EntityType = "LostAndFoundItem";
 
-    public new string Name => "Elveszett és Megtalált Tárgyak";
-    public string Description => "Az iskolában elveszett és megtalált tárgyak listája.";
-
-    public TalaltTargyakView() { }
+    public TalaltTargyakView()
+    {
+    }
 
     public TalaltTargyakView(IStudentContext context)
     {
         _context = context;
     }
+
+    public new string Name => "Elveszett és Megtalált Tárgyak";
+    public string Description => "Az iskolában elveszett és megtalált tárgyak listája.";
 
     public Control CreateView()
     {
@@ -30,7 +33,7 @@ public class TalaltTargyakView : IEvolView
         {
             Orientation = Orientation.Vertical,
             Spacing = 10,
-            Margin = new Avalonia.Thickness(15)
+            Margin = new Thickness(15)
         };
 
         var title = new TextBlock
@@ -56,7 +59,8 @@ public class TalaltTargyakView : IEvolView
 
         mainPanel.Children.Add(title);
         mainPanel.Children.Add(_statusTextBlock);
-        mainPanel.Children.Add(new Border { BorderBrush = Brushes.LightGray, BorderThickness = new Avalonia.Thickness(1), Child = _itemsListBox });
+        mainPanel.Children.Add(new Border
+            { BorderBrush = Brushes.LightGray, BorderThickness = new Thickness(1), Child = _itemsListBox });
 
         LoadItems();
 
@@ -85,13 +89,14 @@ public class TalaltTargyakView : IEvolView
 
             var displayItems = items.OrderByDescending(i => i.CreatedAt).Select(item =>
             {
-                string itemName = item.Data.GetValueOrDefault("ItemName", "Nincs megadva");
-                string description = item.Data.GetValueOrDefault("Description", "Nincs leírás");
-                string foundDate = item.Data.GetValueOrDefault("FoundDate", "Ismeretlen dátum");
-                string location = item.Data.GetValueOrDefault("Location", "Ismeretlen helyszín");
-                string status = item.Data.GetValueOrDefault("Status", "Elérhető");
+                var itemName = item.Data.GetValueOrDefault("ItemName", "Nincs megadva");
+                var description = item.Data.GetValueOrDefault("Description", "Nincs leírás");
+                var foundDate = item.Data.GetValueOrDefault("FoundDate", "Ismeretlen dátum");
+                var location = item.Data.GetValueOrDefault("Location", "Ismeretlen helyszín");
+                var status = item.Data.GetValueOrDefault("Status", "Elérhető");
 
-                return $"Tárgy: {itemName} ({status})\nLeírás: {description}\nMegtalálás helye/ideje: {location}, {foundDate}";
+                return
+                    $"Tárgy: {itemName} ({status})\nLeírás: {description}\nMegtalálás helye/ideje: {location}, {foundDate}";
             }).ToList();
 
             _itemsListBox.ItemsSource = displayItems;

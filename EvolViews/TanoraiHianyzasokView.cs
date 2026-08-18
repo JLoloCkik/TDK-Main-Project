@@ -1,30 +1,31 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Globalization;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
-using Kreta.Core;
 using Kreta.Contexts;
+using Kreta.Core;
 
 public class TanoraiHianyzasokView : IEvolView
 {
-    private IStudentContext? _context;
+    private const string AbsenceEntityType = "Absence";
+    private readonly IStudentContext? _context;
     private ListBox? _missedLessonsListBox;
     private TextBlock? _statusTextBlock;
-    private const string AbsenceEntityType = "Absence";
 
-    public new string Name => "Tanórai Hiányzások";
-    public string Description => "A diák által mulasztott tanórák részletes listája.";
-
-    public TanoraiHianyzasokView() { }
+    public TanoraiHianyzasokView()
+    {
+    }
 
     public TanoraiHianyzasokView(IStudentContext context)
     {
         _context = context;
     }
+
+    public new string Name => "Tanórai Hiányzások";
+    public string Description => "A diák által mulasztott tanórák részletes listája.";
 
     public Control CreateView()
     {
@@ -88,7 +89,10 @@ public class TanoraiHianyzasokView : IEvolView
 
             var myAbsences = allAbsences
                 .Where(a => a.Data.ContainsKey("StudentId") && a.Data["StudentId"] == currentUser.Id.ToString())
-                .OrderByDescending(a => a.Data.ContainsKey("Date") ? DateTime.Parse(a.Data["Date"], CultureInfo.InvariantCulture) : DateTime.MinValue)
+                .OrderByDescending(a =>
+                    a.Data.ContainsKey("Date")
+                        ? DateTime.Parse(a.Data["Date"], CultureInfo.InvariantCulture)
+                        : DateTime.MinValue)
                 .ToList();
 
             if (!myAbsences.Any())
@@ -100,10 +104,12 @@ public class TanoraiHianyzasokView : IEvolView
             {
                 var displayItems = myAbsences.Select(absence =>
                 {
-                    string dateStr = absence.Data.TryGetValue("Date", out var d) ? DateTime.Parse(d, CultureInfo.InvariantCulture).ToString("yyyy.MM.dd.") : "Ismeretlen dátum";
-                    string subjectStr = absence.Data.TryGetValue("SubjectName", out var s) ? s : "Ismeretlen tantárgy";
-                    string topicStr = absence.Data.TryGetValue("Topic", out var t) ? $": {t}" : "";
-                    string statusStr = absence.Data.TryGetValue("JustificationStatus", out var js) ? js : "Igazolandó";
+                    var dateStr = absence.Data.TryGetValue("Date", out var d)
+                        ? DateTime.Parse(d, CultureInfo.InvariantCulture).ToString("yyyy.MM.dd.")
+                        : "Ismeretlen dátum";
+                    var subjectStr = absence.Data.TryGetValue("SubjectName", out var s) ? s : "Ismeretlen tantárgy";
+                    var topicStr = absence.Data.TryGetValue("Topic", out var t) ? $": {t}" : "";
+                    var statusStr = absence.Data.TryGetValue("JustificationStatus", out var js) ? js : "Igazolandó";
 
                     return $"{dateStr} - {subjectStr}{topicStr} ({statusStr})";
                 }).ToList();

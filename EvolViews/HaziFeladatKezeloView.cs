@@ -1,46 +1,47 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Globalization;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
-using Avalonia.Interactivity;
-using Kreta.Core;
 using Kreta.Contexts;
+using Kreta.Core;
 
 public class HaziFeladatKezeloView : IEvolView
 {
-    private ITeacherContext? _context;
-
-    private ListBox? _homeworkListBox;
-    private ComboBox? _classComboBox;
-    private ComboBox? _subjectComboBox;
-    private TextBox? _descriptionTextBox;
-    private DatePicker? _deadlinePicker;
-    private TextBox? _attachmentUrlTextBox;
-    private Button? _saveButton;
-    private Button? _newButton;
-    private TextBlock? _statusTextBlock;
-    private StackPanel? _editPanel;
+    private const string HomeworkEntityType = "Homework";
+    private readonly ITeacherContext? _context;
 
     private List<GenericRecord>? _allHomework;
-    private List<Subject>? _subjects;
+    private TextBox? _attachmentUrlTextBox;
+    private ComboBox? _classComboBox;
     private List<string>? _classes;
+    private DatePicker? _deadlinePicker;
+    private TextBox? _descriptionTextBox;
+    private StackPanel? _editPanel;
+
+    private ListBox? _homeworkListBox;
+    private Button? _newButton;
+    private Button? _saveButton;
     private GenericRecord? _selectedHomework;
+    private TextBlock? _statusTextBlock;
+    private ComboBox? _subjectComboBox;
+    private List<Subject>? _subjects;
 
-    private const string HomeworkEntityType = "Homework";
-
-    public new string Name => "Házi Feladat Kezelő";
-    public string Description => "Házi feladatok kiírása, szerkesztése és mellékletek hozzáadása.";
-
-    public HaziFeladatKezeloView() { }
+    public HaziFeladatKezeloView()
+    {
+    }
 
     public HaziFeladatKezeloView(ITeacherContext context)
     {
         _context = context;
     }
+
+    public new string Name => "Házi Feladat Kezelő";
+    public string Description => "Házi feladatok kiírása, szerkesztése és mellékletek hozzáadása.";
 
     public Control CreateView()
     {
@@ -65,7 +66,10 @@ public class HaziFeladatKezeloView : IEvolView
 
         _classComboBox = new ComboBox { PlaceholderText = "Osztály" };
         _subjectComboBox = new ComboBox { PlaceholderText = "Tantárgy" };
-        _descriptionTextBox = new TextBox { PlaceholderText = "Feladat leírása", Height = 120, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap };
+        _descriptionTextBox = new TextBox
+        {
+            PlaceholderText = "Feladat leírása", Height = 120, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap
+        };
         _deadlinePicker = new DatePicker();
         _attachmentUrlTextBox = new TextBox { PlaceholderText = "Melléklet URL (nem kötelező)" };
         _saveButton = new Button { Content = "Mentés" };
@@ -81,7 +85,7 @@ public class HaziFeladatKezeloView : IEvolView
         Grid.SetColumn(_editPanel, 1);
 
         _statusTextBlock = new TextBlock { Margin = new Thickness(10), VerticalAlignment = VerticalAlignment.Bottom };
-        
+
         var containerPanel = new StackPanel();
         containerPanel.Children.Add(mainGrid);
         containerPanel.Children.Add(_statusTextBlock);
@@ -110,7 +114,7 @@ public class HaziFeladatKezeloView : IEvolView
 
             if (_classComboBox != null) _classComboBox.ItemsSource = _classes;
             if (_subjectComboBox != null) _subjectComboBox.ItemsSource = _subjects?.Select(s => s.Name).ToList();
-            
+
             UpdateHomeworkList();
         }
         catch (Exception ex)
@@ -122,9 +126,11 @@ public class HaziFeladatKezeloView : IEvolView
     private void UpdateHomeworkList()
     {
         if (_homeworkListBox == null || _allHomework == null) return;
-        _homeworkListBox.ItemsSource = _allHomework.OrderByDescending(h => h.CreatedAt).Select(h => {
-             h.Data.TryGetValue("Deadline", out var deadlineStr);
-             return $"{h.Data["ClassName"]} - {deadlineStr} - {h.Data["Description"].Substring(0, Math.Min(h.Data["Description"].Length, 20))}...";
+        _homeworkListBox.ItemsSource = _allHomework.OrderByDescending(h => h.CreatedAt).Select(h =>
+        {
+            h.Data.TryGetValue("Deadline", out var deadlineStr);
+            return
+                $"{h.Data["ClassName"]} - {deadlineStr} - {h.Data["Description"].Substring(0, Math.Min(h.Data["Description"].Length, 20))}...";
         }).ToList();
     }
 
@@ -135,11 +141,13 @@ public class HaziFeladatKezeloView : IEvolView
             ClearForm();
             return;
         }
-        
-        _selectedHomework = _allHomework?.FirstOrDefault(h => 
+
+        _selectedHomework = _allHomework?.FirstOrDefault(h =>
         {
             h.Data.TryGetValue("Deadline", out var deadlineStr);
-            return $"{h.Data["ClassName"]} - {deadlineStr} - {h.Data["Description"].Substring(0, Math.Min(h.Data["Description"].Length, 20))}..." == _homeworkListBox.SelectedItem.ToString();
+            return
+                $"{h.Data["ClassName"]} - {deadlineStr} - {h.Data["Description"].Substring(0, Math.Min(h.Data["Description"].Length, 20))}..." ==
+                _homeworkListBox.SelectedItem.ToString();
         });
 
         if (_selectedHomework != null)
@@ -154,18 +162,16 @@ public class HaziFeladatKezeloView : IEvolView
         if (_classComboBox != null) _classComboBox.SelectedItem = homework.Data["ClassName"];
         if (_subjectComboBox != null && _subjects != null)
         {
-             var subject = _subjects.FirstOrDefault(s => s.Id.ToString() == homework.Data["SubjectId"]);
-             if (subject != null) _subjectComboBox.SelectedItem = subject.Name;
+            var subject = _subjects.FirstOrDefault(s => s.Id.ToString() == homework.Data["SubjectId"]);
+            if (subject != null) _subjectComboBox.SelectedItem = subject.Name;
         }
+
         if (_descriptionTextBox != null) _descriptionTextBox.Text = homework.Data["Description"];
-        if (_deadlinePicker != null && DateTime.TryParse(homework.Data["Deadline"], CultureInfo.InvariantCulture, out var deadline))
-        {
+        if (_deadlinePicker != null &&
+            DateTime.TryParse(homework.Data["Deadline"], CultureInfo.InvariantCulture, out var deadline))
             _deadlinePicker.SelectedDate = deadline;
-        }
-        if (_attachmentUrlTextBox != null) 
-        {
-             _attachmentUrlTextBox.Text = homework.Data.TryGetValue("AttachmentUrl", out var url) ? url : string.Empty;
-        }
+        if (_attachmentUrlTextBox != null)
+            _attachmentUrlTextBox.Text = homework.Data.TryGetValue("AttachmentUrl", out var url) ? url : string.Empty;
     }
 
     private void ClearForm()
@@ -190,17 +196,18 @@ public class HaziFeladatKezeloView : IEvolView
 
     private void SaveButton_Click(object? sender, RoutedEventArgs e)
     {
-        if (_context == null || _classComboBox?.SelectedItem == null || _subjectComboBox?.SelectedItem == null || string.IsNullOrWhiteSpace(_descriptionTextBox?.Text) || _deadlinePicker?.SelectedDate == null)
+        if (_context == null || _classComboBox?.SelectedItem == null || _subjectComboBox?.SelectedItem == null ||
+            string.IsNullOrWhiteSpace(_descriptionTextBox?.Text) || _deadlinePicker?.SelectedDate == null)
         {
             SetStatus("Hiba: Az osztály, tantárgy, leírás és határidő megadása kötelező!");
             return;
         }
 
         var selectedSubject = _subjects?.FirstOrDefault(s => s.Name == _subjectComboBox.SelectedItem.ToString());
-        if (selectedSubject == null) 
+        if (selectedSubject == null)
         {
-             SetStatus("Hiba: Érvénytelen tantárgy kiválasztva.");
-             return;
+            SetStatus("Hiba: Érvénytelen tantárgy kiválasztva.");
+            return;
         }
 
         var data = new Dictionary<string, string>
@@ -228,9 +235,6 @@ public class HaziFeladatKezeloView : IEvolView
 
     private void SetStatus(string message)
     {
-        if (_statusTextBlock != null)
-        {
-            _statusTextBlock.Text = message;
-        }
+        if (_statusTextBlock != null) _statusTextBlock.Text = message;
     }
 }

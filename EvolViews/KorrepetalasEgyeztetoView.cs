@@ -1,43 +1,45 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Globalization;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
-using Avalonia.Interactivity;
-using Kreta.Core;
 using Kreta.Contexts;
+using Kreta.Core;
 
 public class KorrepetalasEgyeztetoView : IEvolView
 {
-    private ITeacherContext? _context;
-    private ListBox? _appointmentsListBox;
-    private ComboBox? _subjectComboBox;
-    private DatePicker? _datePicker;
-    private TextBox? _timeTextBox;
-    private TextBox? _locationTextBox;
-    private NumericUpDown? _maxStudentsNumericUpDown;
-    private Button? _saveButton;
-    private Button? _newButton;
-    private TextBlock? _statusTextBlock;
-    private StackPanel? _editPanel;
+    private const string EntityType = "TutoringAppointment";
+    private readonly ITeacherContext? _context;
 
     private List<GenericRecord>? _allAppointments;
     private List<Subject>? _allSubjects;
+    private ListBox? _appointmentsListBox;
+    private DatePicker? _datePicker;
+    private StackPanel? _editPanel;
+    private TextBox? _locationTextBox;
+    private NumericUpDown? _maxStudentsNumericUpDown;
+    private Button? _newButton;
+    private Button? _saveButton;
     private GenericRecord? _selectedAppointment;
-    private const string EntityType = "TutoringAppointment";
+    private TextBlock? _statusTextBlock;
+    private ComboBox? _subjectComboBox;
+    private TextBox? _timeTextBox;
 
-    public new string Name => "Korrepetálási Időpontok";
-    public string Description => "Korrepetálási időpontok meghirdetése és kezelése, létszámkorláttal.";
-
-    public KorrepetalasEgyeztetoView() { }
+    public KorrepetalasEgyeztetoView()
+    {
+    }
 
     public KorrepetalasEgyeztetoView(ITeacherContext context)
     {
         _context = context;
     }
+
+    public new string Name => "Korrepetálási Időpontok";
+    public string Description => "Korrepetálási időpontok meghirdetése és kezelése, létszámkorláttal.";
 
     public Control CreateView()
     {
@@ -52,7 +54,8 @@ public class KorrepetalasEgyeztetoView : IEvolView
         _appointmentsListBox.SelectionChanged += AppointmentsListBox_SelectionChanged;
         _newButton = new Button { Content = "Új időpont" };
         _newButton.Click += NewButton_Click;
-        leftPanel.Children.Add(new TextBlock { Text = "Meghirdetett időpontok", FontWeight = FontWeight.Bold, Margin = new Thickness(0,0,0,10) });
+        leftPanel.Children.Add(new TextBlock
+            { Text = "Meghirdetett időpontok", FontWeight = FontWeight.Bold, Margin = new Thickness(0, 0, 0, 10) });
         leftPanel.Children.Add(_appointmentsListBox);
         leftPanel.Children.Add(_newButton);
 
@@ -65,21 +68,23 @@ public class KorrepetalasEgyeztetoView : IEvolView
         _datePicker = new DatePicker();
         _timeTextBox = new TextBox { PlaceholderText = "Időpont (pl. 14:30)" };
         _locationTextBox = new TextBox { PlaceholderText = "Helyszín" };
-        _maxStudentsNumericUpDown = new NumericUpDown 
-        { 
+        _maxStudentsNumericUpDown = new NumericUpDown
+        {
             Minimum = 1,
             Maximum = 50,
             Increment = 1,
             Value = 5
         };
-        
+
         var maxStudentPanel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 5 };
-        maxStudentPanel.Children.Add(new TextBlock { Text = "Maximum létszám:", VerticalAlignment = VerticalAlignment.Center });
+        maxStudentPanel.Children.Add(new TextBlock
+            { Text = "Maximum létszám:", VerticalAlignment = VerticalAlignment.Center });
         maxStudentPanel.Children.Add(_maxStudentsNumericUpDown);
 
         _saveButton = new Button { Content = "Mentés" };
         _saveButton.Click += SaveAppointment;
-        _statusTextBlock = new TextBlock { Text = "Válasszon egy időpontot a szerkesztéshez, vagy hozzon létre újat.", Foreground = Brushes.Gray };
+        _statusTextBlock = new TextBlock
+            { Text = "Válasszon egy időpontot a szerkesztéshez, vagy hozzon létre újat.", Foreground = Brushes.Gray };
 
         _editPanel.Children.Add(new TextBlock { Text = "Időpont adatai", FontWeight = FontWeight.Bold });
         _editPanel.Children.Add(_subjectComboBox);
@@ -121,23 +126,25 @@ public class KorrepetalasEgyeztetoView : IEvolView
     private void AppointmentsListBox_SelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (_appointmentsListBox?.SelectedItem == null || _editPanel == null || _allAppointments == null) return;
-        
+
         _selectedAppointment = _allAppointments[_appointmentsListBox.SelectedIndex];
         _editPanel.IsEnabled = true;
 
-        if (_subjectComboBox != null && _selectedAppointment.Data.TryGetValue("SubjectName", out var subjectName)) 
+        if (_subjectComboBox != null && _selectedAppointment.Data.TryGetValue("SubjectName", out var subjectName))
             _subjectComboBox.SelectedItem = subjectName;
-        if (_datePicker != null && _selectedAppointment.Data.TryGetValue("Date", out var dateStr) && DateTime.TryParse(dateStr, out var date))
+        if (_datePicker != null && _selectedAppointment.Data.TryGetValue("Date", out var dateStr) &&
+            DateTime.TryParse(dateStr, out var date))
             _datePicker.SelectedDate = date;
-        if (_timeTextBox != null && _selectedAppointment.Data.TryGetValue("Time", out var time)) 
+        if (_timeTextBox != null && _selectedAppointment.Data.TryGetValue("Time", out var time))
             _timeTextBox.Text = time;
         if (_locationTextBox != null && _selectedAppointment.Data.TryGetValue("Location", out var location))
             _locationTextBox.Text = location;
         if (_maxStudentsNumericUpDown != null)
         {
-             if (_selectedAppointment.Data.TryGetValue("MaxStudents", out var maxStr) && int.TryParse(maxStr, out var maxVal))
+            if (_selectedAppointment.Data.TryGetValue("MaxStudents", out var maxStr) &&
+                int.TryParse(maxStr, out var maxVal))
                 _maxStudentsNumericUpDown.Value = maxVal;
-             else
+            else
                 _maxStudentsNumericUpDown.Value = 5; // Default
         }
 
@@ -154,7 +161,9 @@ public class KorrepetalasEgyeztetoView : IEvolView
 
     private void SaveAppointment(object? sender, RoutedEventArgs e)
     {
-        if (_context == null || _subjectComboBox?.SelectedItem == null || _datePicker?.SelectedDate == null || string.IsNullOrWhiteSpace(_timeTextBox?.Text) || string.IsNullOrWhiteSpace(_locationTextBox?.Text) || _maxStudentsNumericUpDown == null)
+        if (_context == null || _subjectComboBox?.SelectedItem == null || _datePicker?.SelectedDate == null ||
+            string.IsNullOrWhiteSpace(_timeTextBox?.Text) || string.IsNullOrWhiteSpace(_locationTextBox?.Text) ||
+            _maxStudentsNumericUpDown == null)
         {
             if (_statusTextBlock != null) _statusTextBlock.Text = "Hiba: Minden mező kitöltése kötelező!";
             return;
@@ -173,7 +182,7 @@ public class KorrepetalasEgyeztetoView : IEvolView
             ["MaxStudents"] = ((int)_maxStudentsNumericUpDown.Value).ToString(CultureInfo.InvariantCulture)
         };
 
-        int? idToSave = _selectedAppointment?.Id;
+        var idToSave = _selectedAppointment?.Id;
         _context.SaveEntity(EntityType, data, idToSave);
 
         if (_statusTextBlock != null) _statusTextBlock.Text = "Időpont sikeresen mentve!";

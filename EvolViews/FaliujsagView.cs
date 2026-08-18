@@ -7,35 +7,37 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
-using Kreta.Core;
 using Kreta.Contexts;
+using Kreta.Core;
 
 public class FaliujsagView : IEvolView
 {
-    private ITeacherContext? _context;
-    private ListBox? _noticesListBox;
-    private TextBox? _titleTextBox;
-    private TextBox? _contentTextBox;
-    private DatePicker? _expirationDatePicker;
-    private TextBlock? _statusTextBlock;
-    private Button? _saveButton;
-    private Button? _deleteButton;
-    private Button? _newButton;
-    private StackPanel? _editPanel;
+    private const string EntityType = "NoticeMessage";
+    private readonly ITeacherContext? _context;
 
     private List<GenericRecord>? _activeNotices;
+    private TextBox? _contentTextBox;
+    private Button? _deleteButton;
+    private StackPanel? _editPanel;
+    private DatePicker? _expirationDatePicker;
+    private Button? _newButton;
+    private ListBox? _noticesListBox;
+    private Button? _saveButton;
     private GenericRecord? _selectedNotice;
-    private const string EntityType = "NoticeMessage";
+    private TextBlock? _statusTextBlock;
+    private TextBox? _titleTextBox;
 
-    public new string Name => "Faliújság Kezelése";
-    public string Description => "Hirdetmények létrehozása, szerkesztése és törlése a faliújságon, lejárati dátummal.";
-
-    public FaliujsagView() { }
+    public FaliujsagView()
+    {
+    }
 
     public FaliujsagView(ITeacherContext context)
     {
         _context = context;
     }
+
+    public new string Name => "Faliújság Kezelése";
+    public string Description => "Hirdetmények létrehozása, szerkesztése és törlése a faliújságon, lejárati dátummal.";
 
     public Control CreateView()
     {
@@ -82,7 +84,8 @@ public class FaliujsagView : IEvolView
 
         mainGrid.Children.Add(_editPanel);
 
-        var topButtonPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
+        var topButtonPanel = new StackPanel
+            { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
         _newButton = new Button { Content = "Új hirdetmény" };
         _newButton.Click += NewButton_Click;
         topButtonPanel.Children.Add(_newButton);
@@ -104,16 +107,17 @@ public class FaliujsagView : IEvolView
         try
         {
             var allNotices = _context.QueryEntities(EntityType);
-            _activeNotices = allNotices.Where(n => {
-                if (n.Data.TryGetValue("ExpirationDate", out var dateString) && 
-                    DateTime.TryParseExact(dateString, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var expirationDate))
-                {
+            _activeNotices = allNotices.Where(n =>
+            {
+                if (n.Data.TryGetValue("ExpirationDate", out var dateString) &&
+                    DateTime.TryParseExact(dateString, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None,
+                        out var expirationDate))
                     return expirationDate.Date >= DateTime.Now.Date;
-                }
                 return true; // If no date set, it never expires
             }).OrderByDescending(n => n.CreatedAt).ToList();
 
-            _noticesListBox.ItemsSource = _activeNotices.Select(n => n.Data.GetValueOrDefault("Title", "Nincs cím")).ToList();
+            _noticesListBox.ItemsSource =
+                _activeNotices.Select(n => n.Data.GetValueOrDefault("Title", "Nincs cím")).ToList();
             ClearForm();
             SetStatus("Hirdetmények betöltve.", true);
         }
@@ -140,15 +144,12 @@ public class FaliujsagView : IEvolView
         if (_contentTextBox != null) _contentTextBox.Text = _selectedNotice.Data.GetValueOrDefault("Content", "");
         if (_expirationDatePicker != null)
         {
-            if (_selectedNotice.Data.TryGetValue("ExpirationDate", out var dateString) && 
-                DateTime.TryParseExact(dateString, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var expirationDate))
-            {
+            if (_selectedNotice.Data.TryGetValue("ExpirationDate", out var dateString) &&
+                DateTime.TryParseExact(dateString, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None,
+                    out var expirationDate))
                 _expirationDatePicker.SelectedDate = expirationDate;
-            }
             else
-            {
                 _expirationDatePicker.SelectedDate = null;
-            }
         }
     }
 
@@ -171,7 +172,8 @@ public class FaliujsagView : IEvolView
 
     private void SaveButton_Click(object? sender, RoutedEventArgs e)
     {
-        if (_context == null || _titleTextBox == null || _contentTextBox == null || string.IsNullOrWhiteSpace(_titleTextBox.Text))
+        if (_context == null || _titleTextBox == null || _contentTextBox == null ||
+            string.IsNullOrWhiteSpace(_titleTextBox.Text))
         {
             SetStatus("Hiba: A cím mező nem lehet üres.", false);
             return;
@@ -184,10 +186,9 @@ public class FaliujsagView : IEvolView
         };
 
         if (_expirationDatePicker?.SelectedDate != null)
-        {
-            data.Add("ExpirationDate", _expirationDatePicker.SelectedDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
-        }
-        
+            data.Add("ExpirationDate",
+                _expirationDatePicker.SelectedDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+
         try
         {
             var idToSave = _selectedNotice?.Id;

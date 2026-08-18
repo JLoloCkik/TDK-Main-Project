@@ -1,46 +1,48 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using Avalonia.Controls;
-using Avalonia.Layout;
-using Avalonia.Interactivity;
-using Avalonia.Media;
-using Kreta.Core;
-using Kreta.Contexts;
 using System.Globalization;
+using System.Linq;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Interactivity;
+using Avalonia.Layout;
+using Avalonia.Media;
+using Kreta.Contexts;
+using Kreta.Core;
 
 public class EszkozIgenyloView : IEvolView
 {
-    private ITeacherContext? _context;
+    private const string EntityType = "LabEquipmentRequest";
+    private readonly ITeacherContext? _context;
 
     private ComboBox? _equipmentComboBox;
+    private ListBox? _myRequestsListBox;
     private TextBox? _quantityTextBox;
     private TextBox? _reasonTextBox;
-    private Button? _submitButton;
     private TextBlock? _statusTextBlock;
-    private ListBox? _myRequestsListBox;
+    private Button? _submitButton;
 
-    private const string EntityType = "LabEquipmentRequest";
-
-    public new string Name => "Szertári Eszközigénylő";
-    public string Description => "Laboratóriumi eszközök igénylése tanórákhoz és kísérletekhez.";
-
-    public EszkozIgenyloView() { }
+    public EszkozIgenyloView()
+    {
+    }
 
     public EszkozIgenyloView(ITeacherContext context)
     {
         _context = context;
     }
 
+    public new string Name => "Szertári Eszközigénylő";
+    public string Description => "Laboratóriumi eszközök igénylése tanórákhoz és kísérletekhez.";
+
     public Control CreateView()
     {
-        _statusTextBlock = new TextBlock { Text = "Töltse ki az űrlapot az igényléshez.", Margin = new Avalonia.Thickness(5) };
+        _statusTextBlock = new TextBlock { Text = "Töltse ki az űrlapot az igényléshez.", Margin = new Thickness(5) };
 
         var formGrid = new Grid
         {
             ColumnDefinitions = new ColumnDefinitions("Auto,*"),
             RowDefinitions = new RowDefinitions("Auto,Auto,Auto,Auto"),
-            Margin = new Avalonia.Thickness(10)
+            Margin = new Thickness(10)
         };
 
         var equipmentLabel = new TextBlock { Text = "Eszköz:", VerticalAlignment = VerticalAlignment.Center };
@@ -49,9 +51,10 @@ public class EszkozIgenyloView : IEvolView
 
         _equipmentComboBox = new ComboBox
         {
-            ItemsSource = new List<string> { "Főzőpohár", "Kémcső", "Bunsen-égő", "Mikroszkóp", "Petri-csésze", "Mérőhenger" },
+            ItemsSource = new List<string>
+                { "Főzőpohár", "Kémcső", "Bunsen-égő", "Mikroszkóp", "Petri-csésze", "Mérőhenger" },
             SelectedIndex = 0,
-            Margin = new Avalonia.Thickness(5)
+            Margin = new Thickness(5)
         };
         Grid.SetRow(_equipmentComboBox, 0);
         Grid.SetColumn(_equipmentComboBox, 1);
@@ -60,7 +63,7 @@ public class EszkozIgenyloView : IEvolView
         Grid.SetRow(quantityLabel, 1);
         Grid.SetColumn(quantityLabel, 0);
 
-        _quantityTextBox = new TextBox { Margin = new Avalonia.Thickness(5) };
+        _quantityTextBox = new TextBox { Margin = new Thickness(5) };
         Grid.SetRow(_quantityTextBox, 1);
         Grid.SetColumn(_quantityTextBox, 1);
 
@@ -68,11 +71,11 @@ public class EszkozIgenyloView : IEvolView
         Grid.SetRow(reasonLabel, 2);
         Grid.SetColumn(reasonLabel, 0);
 
-        _reasonTextBox = new TextBox { Margin = new Avalonia.Thickness(5) };
+        _reasonTextBox = new TextBox { Margin = new Thickness(5) };
         Grid.SetRow(_reasonTextBox, 2);
         Grid.SetColumn(_reasonTextBox, 1);
 
-        _submitButton = new Button { Content = "Igénylés elküldése", Margin = new Avalonia.Thickness(5) };
+        _submitButton = new Button { Content = "Igénylés elküldése", Margin = new Thickness(5) };
         _submitButton.Click += SubmitRequest_Click;
         Grid.SetRow(_submitButton, 3);
         Grid.SetColumn(_submitButton, 1);
@@ -84,15 +87,15 @@ public class EszkozIgenyloView : IEvolView
         formGrid.Children.Add(reasonLabel);
         formGrid.Children.Add(_reasonTextBox);
         formGrid.Children.Add(_submitButton);
-        
-        var requestHeader = new TextBlock 
+
+        var requestHeader = new TextBlock
         {
-             Text = "Leadott igényléseim", 
-             FontWeight = FontWeight.Bold, 
-             Margin = new Avalonia.Thickness(10,20,10,5)
+            Text = "Leadott igényléseim",
+            FontWeight = FontWeight.Bold,
+            Margin = new Thickness(10, 20, 10, 5)
         };
 
-        _myRequestsListBox = new ListBox { Margin = new Avalonia.Thickness(10) };
+        _myRequestsListBox = new ListBox { Margin = new Thickness(10) };
 
         var mainPanel = new StackPanel
         {
@@ -103,15 +106,19 @@ public class EszkozIgenyloView : IEvolView
                 new Border
                 {
                     BorderBrush = Brushes.Gray,
-                    BorderThickness = new Avalonia.Thickness(1),
-                    CornerRadius = new Avalonia.CornerRadius(5),
-                    Padding = new Avalonia.Thickness(10),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(5),
+                    Padding = new Thickness(10),
                     Child = new StackPanel
                     {
-                        Children = 
+                        Children =
                         {
-                             new TextBlock { Text = "Új igénylés leadása", FontWeight = FontWeight.Bold, Margin=new Avalonia.Thickness(0,0,0,10) },
-                             formGrid
+                            new TextBlock
+                            {
+                                Text = "Új igénylés leadása", FontWeight = FontWeight.Bold,
+                                Margin = new Thickness(0, 0, 0, 10)
+                            },
+                            formGrid
                         }
                     }
                 },
@@ -120,7 +127,7 @@ public class EszkozIgenyloView : IEvolView
                 _myRequestsListBox
             }
         };
-        
+
         LoadMyRequests();
 
         return mainPanel;
@@ -137,21 +144,21 @@ public class EszkozIgenyloView : IEvolView
             // In a more advanced system, we would filter by the teacher's own ID here.
             _myRequestsListBox.ItemsSource = allRequests
                 .OrderByDescending(r => r.CreatedAt)
-                .Select(r => $"{r.CreatedAt:yyyy-MM-dd} - {r.Data["EquipmentName"]} ({r.Data["Quantity"]} db) - Állapot: {r.Data["Status"]}")
+                .Select(r =>
+                    $"{r.CreatedAt:yyyy-MM-dd} - {r.Data["EquipmentName"]} ({r.Data["Quantity"]} db) - Állapot: {r.Data["Status"]}")
                 .ToList();
         }
         catch (Exception ex)
         {
-             if (_statusTextBlock != null) _statusTextBlock.Text = $"Hiba a korábbi igénylések betöltésekor: {ex.Message}";
+            if (_statusTextBlock != null)
+                _statusTextBlock.Text = $"Hiba a korábbi igénylések betöltésekor: {ex.Message}";
         }
     }
 
     private void SubmitRequest_Click(object? sender, RoutedEventArgs e)
     {
-        if (_context == null || _statusTextBlock == null || _equipmentComboBox == null || _quantityTextBox == null || _reasonTextBox == null)
-        {
-            return;
-        }
+        if (_context == null || _statusTextBlock == null || _equipmentComboBox == null || _quantityTextBox == null ||
+            _reasonTextBox == null) return;
 
         if (_equipmentComboBox.SelectedItem == null)
         {
@@ -159,7 +166,7 @@ public class EszkozIgenyloView : IEvolView
             return;
         }
 
-        if (!int.TryParse(_quantityTextBox.Text, out int quantity) || quantity <= 0)
+        if (!int.TryParse(_quantityTextBox.Text, out var quantity) || quantity <= 0)
         {
             _statusTextBlock.Text = "Hiba: A mennyiség csak pozitív egész szám lehet!";
             return;

@@ -3,34 +3,35 @@ using System.Collections.Generic;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Layout;
 using Avalonia.Media;
-using Kreta.Core;
 using Kreta.Contexts;
+using Kreta.Core;
 
 public class SzakkorInfoView : IEvolView
 {
-    private IStudentContext? _context;
+    private const string EntityType = "AfterSchoolClub";
+    private readonly IStudentContext? _context;
     private ListBox? _clubListBox;
-    private TextBlock? _statusTextBlock;
-    private Border? _detailsBorder;
-    private TextBlock? _detailsNameTextBlock;
-    private TextBlock? _detailsDescriptionTextBlock;
-    private TextBlock? _detailsLeaderTextBlock;
-    private TextBlock? _detailsScheduleTextBlock;
 
     private List<GenericRecord>? _clubs;
-    private const string EntityType = "AfterSchoolClub";
+    private Border? _detailsBorder;
+    private TextBlock? _detailsDescriptionTextBlock;
+    private TextBlock? _detailsLeaderTextBlock;
+    private TextBlock? _detailsNameTextBlock;
+    private TextBlock? _detailsScheduleTextBlock;
+    private TextBlock? _statusTextBlock;
 
-    public new string Name => "Szakkör Információk";
-    public string Description => "Választható délutáni szakkörök és információik megtekintése.";
-
-    public SzakkorInfoView() { }
+    public SzakkorInfoView()
+    {
+    }
 
     public SzakkorInfoView(IStudentContext context)
     {
         _context = context;
     }
+
+    public new string Name => "Szakkör Információk";
+    public string Description => "Választható délutáni szakkörök és információik megtekintése.";
 
     public Control CreateView()
     {
@@ -79,7 +80,11 @@ public class SzakkorInfoView : IEvolView
 
         var listPanel = new StackPanel
         {
-             Children = { new TextBlock { Text="Választható szakkörök", FontSize=16, Margin=new Thickness(0,0,0,10)}, _clubListBox, _statusTextBlock }
+            Children =
+            {
+                new TextBlock { Text = "Választható szakkörök", FontSize = 16, Margin = new Thickness(0, 0, 0, 10) },
+                _clubListBox, _statusTextBlock
+            }
         };
 
         mainGrid.Children.Add(listPanel);
@@ -126,18 +131,23 @@ public class SzakkorInfoView : IEvolView
         }
 
         var selectedClub = _clubs[_clubListBox.SelectedIndex];
-        
+
         if (_detailsNameTextBlock != null)
             _detailsNameTextBlock.Text = selectedClub.Data.TryGetValue("Name", out var name) ? name : "Nincs név";
 
         if (_detailsLeaderTextBlock != null)
-            _detailsLeaderTextBlock.Text = selectedClub.Data.TryGetValue("Leader", out var leader) ? $"Vezető: {leader}" : "Vezető: Ismeretlen";
-        
+            _detailsLeaderTextBlock.Text = selectedClub.Data.TryGetValue("Leader", out var leader)
+                ? $"Vezető: {leader}"
+                : "Vezető: Ismeretlen";
+
         if (_detailsScheduleTextBlock != null)
-            _detailsScheduleTextBlock.Text = selectedClub.Data.TryGetValue("Schedule", out var schedule) ? $"Időpont: {schedule}" : "Időpont: Ismeretlen";
+            _detailsScheduleTextBlock.Text = selectedClub.Data.TryGetValue("Schedule", out var schedule)
+                ? $"Időpont: {schedule}"
+                : "Időpont: Ismeretlen";
 
         if (_detailsDescriptionTextBlock != null)
-            _detailsDescriptionTextBlock.Text = selectedClub.Data.TryGetValue("Description", out var desc) ? desc : "Nincs leírás.";
+            _detailsDescriptionTextBlock.Text =
+                selectedClub.Data.TryGetValue("Description", out var desc) ? desc : "Nincs leírás.";
 
         _detailsBorder.IsVisible = true;
     }

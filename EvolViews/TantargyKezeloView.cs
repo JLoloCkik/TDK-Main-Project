@@ -6,33 +6,35 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
-using Kreta.Core;
 using Kreta.Contexts;
+using Kreta.Core;
 
 public class TantargyKezeloView : IEvolView
 {
-    private IDirectorContext? _context;
-    private ListBox? _subjectListBox;
-    private TextBox? _nameTextBox;
-    private TextBlock? _statusTextBlock;
-    private Button? _saveButton;
+    private const string EntityType = "Subject";
+    private readonly IDirectorContext? _context;
     private Button? _deleteButton;
-    private Button? _newButton;
     private StackPanel? _editPanel;
+    private TextBox? _nameTextBox;
+    private Button? _newButton;
+    private Button? _saveButton;
+    private GenericRecord? _selectedSubject;
+    private TextBlock? _statusTextBlock;
+    private ListBox? _subjectListBox;
 
     private List<GenericRecord>? _subjects;
-    private GenericRecord? _selectedSubject;
-    private const string EntityType = "Subject";
 
-    public new string Name => "Tantárgykezelés";
-    public string Description => "Iskolai tantárgyak létrehozása, szerkesztése és törlése.";
-
-    public TantargyKezeloView() { }
+    public TantargyKezeloView()
+    {
+    }
 
     public TantargyKezeloView(IDirectorContext context)
     {
         _context = context;
     }
+
+    public new string Name => "Tantárgykezelés";
+    public string Description => "Iskolai tantárgyak létrehozása, szerkesztése és törlése.";
 
     public Control CreateView()
     {
@@ -61,8 +63,8 @@ public class TantargyKezeloView : IEvolView
         _saveButton = new Button { Content = "Mentés" };
         _saveButton.Click += SaveButton_Click;
 
-        _deleteButton = new Button 
-        { 
+        _deleteButton = new Button
+        {
             Content = "Törlés",
             Background = Brushes.Red,
             Foreground = Brushes.White,
@@ -85,7 +87,7 @@ public class TantargyKezeloView : IEvolView
             Margin = new Thickness(0, 0, 0, 10)
         };
         _newButton.Click += NewButton_Click;
-        
+
         var rightPanel = new StackPanel();
         rightPanel.Children.Add(_newButton);
         rightPanel.Children.Add(_editPanel);
@@ -111,10 +113,12 @@ public class TantargyKezeloView : IEvolView
     private void LoadSubjects()
     {
         if (_context == null || _subjectListBox == null) return;
-        
-        _subjects = _context.QueryEntities(EntityType).OrderBy(s => s.Data.ContainsKey("Name") ? s.Data["Name"] : "").ToList();
-        _subjectListBox.ItemsSource = _subjects.Select(s => s.Data.ContainsKey("Name") ? s.Data["Name"] : "N/A").ToList();
-        
+
+        _subjects = _context.QueryEntities(EntityType).OrderBy(s => s.Data.ContainsKey("Name") ? s.Data["Name"] : "")
+            .ToList();
+        _subjectListBox.ItemsSource =
+            _subjects.Select(s => s.Data.ContainsKey("Name") ? s.Data["Name"] : "N/A").ToList();
+
         ClearForm();
     }
 
@@ -139,11 +143,12 @@ public class TantargyKezeloView : IEvolView
     {
         if (_subjectListBox?.SelectedItem == null || _subjects == null) return;
 
-        int selectedIndex = _subjectListBox.SelectedIndex;
+        var selectedIndex = _subjectListBox.SelectedIndex;
         if (selectedIndex >= 0 && selectedIndex < _subjects.Count)
         {
             _selectedSubject = _subjects[selectedIndex];
-            if (_nameTextBox != null) _nameTextBox.Text = _selectedSubject.Data.ContainsKey("Name") ? _selectedSubject.Data["Name"] : "";
+            if (_nameTextBox != null)
+                _nameTextBox.Text = _selectedSubject.Data.ContainsKey("Name") ? _selectedSubject.Data["Name"] : "";
             if (_editPanel != null) _editPanel.IsVisible = true;
             if (_deleteButton != null) _deleteButton.IsVisible = true;
             if (_statusTextBlock != null) _statusTextBlock.Text = "";
@@ -176,7 +181,7 @@ public class TantargyKezeloView : IEvolView
     {
         if (_context == null || _selectedSubject == null)
         {
-             if (_statusTextBlock != null) _statusTextBlock.Text = "Nincs kiválasztott tantárgy a törléshez.";
+            if (_statusTextBlock != null) _statusTextBlock.Text = "Nincs kiválasztott tantárgy a törléshez.";
             return;
         }
 

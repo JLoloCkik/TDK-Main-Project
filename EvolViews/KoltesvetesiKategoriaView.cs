@@ -6,35 +6,37 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
-using Kreta.Core;
 using Kreta.Contexts;
+using Kreta.Core;
 
 public class KoltesvetesiKategoriaView : IEvolView
 {
-    private IDirectorContext? _context;
-    private ListBox? _categoryListBox;
-    private TextBox? _nameTextBox;
-    private TextBox? _codeTextBox;
-    private TextBox? _descriptionTextBox;
-    private TextBlock? _statusTextBlock;
-    private Button? _saveButton;
-    private Button? _deleteButton;
-    private Button? _newButton;
-    private StackPanel? _editPanel;
+    private const string EntityType = "BudgetCategory";
+    private readonly IDirectorContext? _context;
 
     private List<GenericRecord>? _categories;
+    private ListBox? _categoryListBox;
+    private TextBox? _codeTextBox;
+    private Button? _deleteButton;
+    private TextBox? _descriptionTextBox;
+    private StackPanel? _editPanel;
+    private TextBox? _nameTextBox;
+    private Button? _newButton;
+    private Button? _saveButton;
     private GenericRecord? _selectedCategory;
-    private const string EntityType = "BudgetCategory";
+    private TextBlock? _statusTextBlock;
 
-    public new string Name => "Költségvetési Kategóriák";
-    public string Description => "Iskolai költségvetési kategóriák létrehozása, szerkesztése és törlése.";
-
-    public KoltesvetesiKategoriaView() { }
+    public KoltesvetesiKategoriaView()
+    {
+    }
 
     public KoltesvetesiKategoriaView(IDirectorContext context)
     {
         _context = context;
     }
+
+    public new string Name => "Költségvetési Kategóriák";
+    public string Description => "Iskolai költségvetési kategóriák létrehozása, szerkesztése és törlése.";
 
     public Control CreateView()
     {
@@ -70,7 +72,8 @@ public class KoltesvetesiKategoriaView : IEvolView
             IsEnabled = false
         };
 
-        _editPanel.Children.Add(new TextBlock { Text = "Kategória adatai", FontSize = 16, FontWeight = FontWeight.Bold });
+        _editPanel.Children.Add(
+            new TextBlock { Text = "Kategória adatai", FontSize = 16, FontWeight = FontWeight.Bold });
 
         _editPanel.Children.Add(new TextBlock { Text = "Megnevezés:" });
         _nameTextBox = new TextBox();
@@ -110,7 +113,8 @@ public class KoltesvetesiKategoriaView : IEvolView
         if (_context == null || _categoryListBox == null) return;
         try
         {
-            _categories = _context.QueryEntities(EntityType).OrderBy(c => c.Data.GetValueOrDefault("Name", string.Empty)).ToList();
+            _categories = _context.QueryEntities(EntityType)
+                .OrderBy(c => c.Data.GetValueOrDefault("Name", string.Empty)).ToList();
             _categoryListBox.ItemsSource = _categories.Select(c => c.Data.GetValueOrDefault("Name", "N/A")).ToList();
         }
         catch (Exception ex)
@@ -130,7 +134,8 @@ public class KoltesvetesiKategoriaView : IEvolView
 
         _selectedCategory = _categories?[_categoryListBox.SelectedIndex];
 
-        if (_selectedCategory != null && _nameTextBox != null && _codeTextBox != null && _descriptionTextBox != null && _editPanel != null)
+        if (_selectedCategory != null && _nameTextBox != null && _codeTextBox != null && _descriptionTextBox != null &&
+            _editPanel != null)
         {
             _nameTextBox.Text = _selectedCategory.Data.GetValueOrDefault("Name");
             _codeTextBox.Text = _selectedCategory.Data.GetValueOrDefault("Code");
@@ -151,7 +156,8 @@ public class KoltesvetesiKategoriaView : IEvolView
 
     private void SaveButton_Click(object? sender, RoutedEventArgs e)
     {
-        if (_context == null || _nameTextBox == null || string.IsNullOrWhiteSpace(_nameTextBox.Text) || _codeTextBox == null || string.IsNullOrWhiteSpace(_codeTextBox.Text))
+        if (_context == null || _nameTextBox == null || string.IsNullOrWhiteSpace(_nameTextBox.Text) ||
+            _codeTextBox == null || string.IsNullOrWhiteSpace(_codeTextBox.Text))
         {
             SetStatus("A megnevezés és a kód megadása kötelező!", true);
             return;
@@ -166,7 +172,7 @@ public class KoltesvetesiKategoriaView : IEvolView
 
         try
         {
-            int id = _context.SaveEntity(EntityType, data, _selectedCategory?.Id);
+            var id = _context.SaveEntity(EntityType, data, _selectedCategory?.Id);
             SetStatus($"Kategória sikeresen mentve (ID: {id}).", false);
             LoadCategories();
             ClearForm();
@@ -192,7 +198,7 @@ public class KoltesvetesiKategoriaView : IEvolView
             SetStatus("Kategória sikeresen törölve.", false);
             LoadCategories();
             ClearForm();
-             if (_editPanel != null) _editPanel.IsEnabled = false;
+            if (_editPanel != null) _editPanel.IsEnabled = false;
         }
         catch (Exception ex)
         {

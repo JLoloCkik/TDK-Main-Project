@@ -1,32 +1,34 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Globalization;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
-using Kreta.Core;
 using Kreta.Contexts;
+using Kreta.Core;
 
 public class HelyettesitesiOraretekView : IEvolView
 {
-    private ITeacherContext? _context;
-    private ListBox? _substitutionListBox;
+    private const string SubstitutionEntityType = "Substitution";
+    private readonly ITeacherContext? _context;
+    private List<GenericRecord>? _allSubstitutions;
     private DatePicker? _datePicker;
     private TextBlock? _statusTextBlock;
-    private List<GenericRecord>? _allSubstitutions;
-    private const string SubstitutionEntityType = "Substitution";
+    private ListBox? _substitutionListBox;
 
-    public new string Name => "Helyettesítési Órarend";
-    public string Description => "A napi helyettesítések megtekintése, teremváltási figyelmeztetéssel.";
-
-    public HelyettesitesiOraretekView() { }
+    public HelyettesitesiOraretekView()
+    {
+    }
 
     public HelyettesitesiOraretekView(ITeacherContext context)
     {
         _context = context;
     }
+
+    public new string Name => "Helyettesítési Órarend";
+    public string Description => "A napi helyettesítések megtekintése, teremváltási figyelmeztetéssel.";
 
     public Control CreateView()
     {
@@ -105,10 +107,7 @@ public class HelyettesitesiOraretekView : IEvolView
 
     private void DisplaySubstitutionsForSelectedDate()
     {
-        if (_substitutionListBox == null || _datePicker?.SelectedDate == null || _statusTextBlock == null)
-        {
-            return;
-        }
+        if (_substitutionListBox == null || _datePicker?.SelectedDate == null || _statusTextBlock == null) return;
 
         if (_allSubstitutions == null)
         {
@@ -120,7 +119,9 @@ public class HelyettesitesiOraretekView : IEvolView
 
         var selectedDate = _datePicker.SelectedDate.Value.Date;
         var substitutionsForDay = _allSubstitutions
-            .Where(s => s.Data.ContainsKey("Date") && DateTime.TryParse(s.Data["Date"], CultureInfo.InvariantCulture, DateTimeStyles.None, out var subDate) && subDate.Date == selectedDate)
+            .Where(s => s.Data.ContainsKey("Date") &&
+                        DateTime.TryParse(s.Data["Date"], CultureInfo.InvariantCulture, DateTimeStyles.None,
+                            out var subDate) && subDate.Date == selectedDate)
             .OrderBy(s => s.Data.GetValueOrDefault("LessonTime", "99"))
             .ToList();
 
@@ -141,14 +142,17 @@ public class HelyettesitesiOraretekView : IEvolView
 
                 var itemPanel = new StackPanel { Spacing = 5 };
 
-                string className = sub.Data.GetValueOrDefault("ClassName", "N/A");
-                string subjectName = sub.Data.GetValueOrDefault("SubjectName", "N/A");
-                string lessonTime = sub.Data.GetValueOrDefault("LessonTime", "N/A");
-                string substituteTeacher = sub.Data.GetValueOrDefault("SubstituteTeacherName", "N/A");
-                string originalRoom = sub.Data.GetValueOrDefault("OriginalRoom", "N/A");
-                string newRoom = sub.Data.GetValueOrDefault("NewRoom", "");
+                var className = sub.Data.GetValueOrDefault("ClassName", "N/A");
+                var subjectName = sub.Data.GetValueOrDefault("SubjectName", "N/A");
+                var lessonTime = sub.Data.GetValueOrDefault("LessonTime", "N/A");
+                var substituteTeacher = sub.Data.GetValueOrDefault("SubstituteTeacherName", "N/A");
+                var originalRoom = sub.Data.GetValueOrDefault("OriginalRoom", "N/A");
+                var newRoom = sub.Data.GetValueOrDefault("NewRoom", "");
 
-                itemPanel.Children.Add(new TextBlock { Text = $"{lessonTime}: {className} - {subjectName}", FontWeight = FontWeight.Bold, FontSize = 14 });
+                itemPanel.Children.Add(new TextBlock
+                {
+                    Text = $"{lessonTime}: {className} - {subjectName}", FontWeight = FontWeight.Bold, FontSize = 14
+                });
                 itemPanel.Children.Add(new TextBlock { Text = $"Helyettesítő tanár: {substituteTeacher}" });
 
                 if (!string.IsNullOrEmpty(newRoom) && newRoom != originalRoom)
@@ -169,6 +173,7 @@ public class HelyettesitesiOraretekView : IEvolView
                 itemBorder.Child = itemPanel;
                 listBoxItems.Add(itemBorder);
             }
+
             _substitutionListBox.ItemsSource = listBoxItems;
         }
         else

@@ -1,27 +1,28 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Globalization;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
-using Kreta.Core;
 using Kreta.Contexts;
+using Kreta.Core;
 
 public class OrarendemView : IEvolView
 {
-    private IStudentContext? _context;
+    private readonly IStudentContext? _context;
 
-    public new string Name => "Órarendem";
-    public string Description => "A diák személyes órarendjének megtekintése, a mai nap kiemelésével.";
-
-    public OrarendemView() { }
+    public OrarendemView()
+    {
+    }
 
     public OrarendemView(IStudentContext context)
     {
         _context = context;
     }
+
+    public new string Name => "Órarendem";
+    public string Description => "A diák személyes órarendjének megtekintése, a mai nap kiemelésével.";
 
     public Control CreateView()
     {
@@ -71,11 +72,12 @@ public class OrarendemView : IEvolView
             foreach (var dayGroup in groupedLessons)
             {
                 var lessonDate = dayGroup.Key;
-                bool isToday = lessonDate == today;
+                var isToday = lessonDate == today;
 
                 var dayHeader = new TextBlock
                 {
-                    Text = $"{culture.DateTimeFormat.GetDayName(lessonDate.DayOfWeek).ToUpper()}, {lessonDate:yyyy. MM. dd.}",
+                    Text =
+                        $"{culture.DateTimeFormat.GetDayName(lessonDate.DayOfWeek).ToUpper()}, {lessonDate:yyyy. MM. dd.}",
                     FontSize = 16,
                     FontWeight = FontWeight.Bold,
                     Padding = new Thickness(8),
@@ -119,7 +121,7 @@ public class OrarendemView : IEvolView
                         VerticalAlignment = VerticalAlignment.Center
                     };
                     Grid.SetColumn(roomText, 1);
-                    
+
                     lessonGrid.Children.Add(subjectText);
                     lessonGrid.Children.Add(roomText);
                     lessonBorder.Child = lessonGrid;
@@ -131,10 +133,7 @@ public class OrarendemView : IEvolView
         catch (Exception ex)
         {
             statusTextBlock.Text = $"Hiba történt az órarend betöltése közben: {ex.Message}";
-            if(!mainPanel.Children.Contains(statusTextBlock))
-            {
-                 mainPanel.Children.Insert(0, statusTextBlock);
-            }
+            if (!mainPanel.Children.Contains(statusTextBlock)) mainPanel.Children.Insert(0, statusTextBlock);
         }
 
         return mainScrollViewer;

@@ -1,35 +1,38 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
-using Kreta.Core;
 using Kreta.Contexts;
-using System.Globalization;
+using Kreta.Core;
 
 public class DokHirekView : IEvolView
 {
-    private IStudentContext? _context;
+    private const string EntityType = "StudentCouncilNews";
+    private readonly IStudentContext? _context;
+
+    private List<GenericRecord>? _hirek;
     private ListBox? _hirekListBox;
-    private TextBlock? _statusTextBlock;
     private Border? _reszletekBorder;
     private TextBlock? _reszletekCimTextBlock;
     private TextBlock? _reszletekDatumTextBlock;
     private TextBlock? _reszletekTartalomTextBlock;
+    private TextBlock? _statusTextBlock;
 
-    private List<GenericRecord>? _hirek;
-    private const string EntityType = "StudentCouncilNews";
-
-    public new string Name => "DÖK Hírek";
-    public string Description => "A Diákönkormányzat legfrissebb híreinek és közleményeinek megtekintése.";
-
-    public DokHirekView() { }
+    public DokHirekView()
+    {
+    }
 
     public DokHirekView(IStudentContext context)
     {
         _context = context;
     }
+
+    public new string Name => "DÖK Hírek";
+    public string Description => "A Diákönkormányzat legfrissebb híreinek és közleményeinek megtekintése.";
 
     public Control CreateView()
     {
@@ -37,7 +40,7 @@ public class DokHirekView : IEvolView
         {
             Orientation = Orientation.Vertical,
             Spacing = 10,
-            Margin = new Avalonia.Thickness(15)
+            Margin = new Thickness(15)
         };
 
         var title = new TextBlock
@@ -48,25 +51,28 @@ public class DokHirekView : IEvolView
             HorizontalAlignment = HorizontalAlignment.Center
         };
 
-        _statusTextBlock = new TextBlock { Text = "Hírek betöltése...", HorizontalAlignment = HorizontalAlignment.Center };
-        
-        _hirekListBox = new ListBox 
+        _statusTextBlock = new TextBlock
+            { Text = "Hírek betöltése...", HorizontalAlignment = HorizontalAlignment.Center };
+
+        _hirekListBox = new ListBox
         {
             MaxHeight = 200
         };
         _hirekListBox.SelectionChanged += HirekListBox_SelectionChanged;
 
-        _reszletekCimTextBlock = new TextBlock { FontSize = 16, FontWeight = FontWeight.Bold, TextWrapping = TextWrapping.Wrap };
-        _reszletekDatumTextBlock = new TextBlock { FontStyle = FontStyle.Italic, Foreground = Brushes.Gray, Margin = new Avalonia.Thickness(0, 5, 0, 10) };
+        _reszletekCimTextBlock = new TextBlock
+            { FontSize = 16, FontWeight = FontWeight.Bold, TextWrapping = TextWrapping.Wrap };
+        _reszletekDatumTextBlock = new TextBlock
+            { FontStyle = FontStyle.Italic, Foreground = Brushes.Gray, Margin = new Thickness(0, 5, 0, 10) };
         _reszletekTartalomTextBlock = new TextBlock { TextWrapping = TextWrapping.Wrap };
 
         _reszletekBorder = new Border
         {
             BorderBrush = Brushes.LightGray,
-            BorderThickness = new Avalonia.Thickness(1),
-            CornerRadius = new Avalonia.CornerRadius(5),
-            Padding = new Avalonia.Thickness(10),
-            Margin = new Avalonia.Thickness(0, 10, 0, 0),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(5),
+            Padding = new Thickness(10),
+            Margin = new Thickness(0, 10, 0, 0),
             IsVisible = false,
             Child = new StackPanel
             {
@@ -121,17 +127,18 @@ public class DokHirekView : IEvolView
 
     private void HirekListBox_SelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (_hirekListBox == null || _reszletekBorder == null || _hirek == null || 
+        if (_hirekListBox == null || _reszletekBorder == null || _hirek == null ||
             _reszletekCimTextBlock == null || _reszletekDatumTextBlock == null || _reszletekTartalomTextBlock == null)
             return;
 
-        int selectedIndex = _hirekListBox.SelectedIndex;
+        var selectedIndex = _hirekListBox.SelectedIndex;
 
         if (selectedIndex >= 0 && selectedIndex < _hirek.Count)
         {
             var selectedHir = _hirek[selectedIndex];
             _reszletekCimTextBlock.Text = selectedHir.Data.GetValueOrDefault("Title", "Nincs cím");
-            _reszletekDatumTextBlock.Text = selectedHir.CreatedAt.ToString("yyyy. MMMM dd. HH:mm", CultureInfo.CurrentCulture);
+            _reszletekDatumTextBlock.Text =
+                selectedHir.CreatedAt.ToString("yyyy. MMMM dd. HH:mm", CultureInfo.CurrentCulture);
             _reszletekTartalomTextBlock.Text = selectedHir.Data.GetValueOrDefault("Content", "Nincs tartalom.");
             _reszletekBorder.IsVisible = true;
         }

@@ -9,8 +9,8 @@ using Kreta.Core;
 namespace Kreta.Services.AI;
 
 /// <summary>
-/// Preprocessing LLM service that transforms the unstructured raw prompt into a formal JSON specification,
-/// and performs early RBAC pre-filtering before C# code generation.
+///     Preprocessing LLM service that transforms the unstructured raw prompt into a formal JSON specification,
+///     and performs early RBAC pre-filtering before C# code generation.
 /// </summary>
 public class PromptRefinerService : IPromptRefinerService
 {
@@ -119,14 +119,13 @@ TASK:
                 partsEl.ValueKind == JsonValueKind.Array &&
                 partsEl.GetArrayLength() > 0 &&
                 partsEl[0].TryGetProperty("text", out var textEl))
-            {
                 responseText = textEl.GetString();
-            }
 
             if (string.IsNullOrWhiteSpace(responseText))
             {
-                string? finishReason = candidate.TryGetProperty("finishReason", out var fr) ? fr.GetString() : null;
-                return CreateAndLogFallbackSpec(rawPrompt, role, $"Üres válasz az AI-tól (finishReason: {finishReason ?? "ismeretlen"})");
+                var finishReason = candidate.TryGetProperty("finishReason", out var fr) ? fr.GetString() : null;
+                return CreateAndLogFallbackSpec(rawPrompt, role,
+                    $"Üres válasz az AI-tól (finishReason: {finishReason ?? "ismeretlen"})");
             }
 
             var spec = JsonSerializer.Deserialize<FormalPromptSpecification>(responseText, new JsonSerializerOptions
@@ -155,10 +154,7 @@ TASK:
         Console.WriteLine($" - Szükséges kontextus metódusok: {string.Join(", ", resultSpec.RequiredContextMethods)}");
         Console.WriteLine($" - Tiltott metódusok: {string.Join(", ", resultSpec.ForbiddenContextMethods)}");
         Console.WriteLine($" - Szerepkör megsértve: {resultSpec.IsRoleViolating}");
-        if (resultSpec.IsRoleViolating)
-        {
-            Console.WriteLine($" - Indoklás: {resultSpec.ViolationReason}");
-        }
+        if (resultSpec.IsRoleViolating) Console.WriteLine($" - Indoklás: {resultSpec.ViolationReason}");
 
         Console.WriteLine("=========================================");
     }

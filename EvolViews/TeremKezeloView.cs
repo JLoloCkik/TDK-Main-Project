@@ -1,38 +1,40 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Globalization;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
-using Kreta.Core;
 using Kreta.Contexts;
+using Kreta.Core;
 
 public class TeremKezeloView : IEvolView
 {
-    private IDirectorContext? _context;
+    private const string LessonEntityType = "Lesson";
+    private readonly IDirectorContext? _context;
+
+    private List<GenericRecord>? _allLessons;
     private DatePicker? _datePicker;
+    private StackPanel? _editPanel;
     private ListBox? _lessonsListBox;
     private TextBox? _roomTextBox;
     private Button? _saveButton;
-    private TextBlock? _statusTextBlock;
-    private StackPanel? _editPanel;
-
-    private List<GenericRecord>? _allLessons;
     private GenericRecord? _selectedLesson;
-    private const string LessonEntityType = "Lesson";
+    private TextBlock? _statusTextBlock;
 
-    public new string Name => "Terem Kezelés";
-    public string Description => "Teremfoglaltság megtekintése és tanórák termeinek módosítása.";
-
-    public TeremKezeloView() { }
+    public TeremKezeloView()
+    {
+    }
 
     public TeremKezeloView(IDirectorContext context)
     {
         _context = context;
     }
+
+    public new string Name => "Terem Kezelés";
+    public string Description => "Teremfoglaltság megtekintése és tanórák termeinek módosítása.";
 
     public Control CreateView()
     {
@@ -111,41 +113,48 @@ public class TeremKezeloView : IEvolView
         var selectedDate = _datePicker.SelectedDate.Value.Date;
 
         var dailyLessons = _allLessons
-            .Where(lesson => lesson.Data.ContainsKey("Date") && 
-                             DateTime.TryParse(lesson.Data["Date"], CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var lessonDate) && 
+            .Where(lesson => lesson.Data.ContainsKey("Date") &&
+                             DateTime.TryParse(lesson.Data["Date"], CultureInfo.InvariantCulture,
+                                 DateTimeStyles.AssumeLocal, out var lessonDate) &&
                              lessonDate.Date == selectedDate)
-            .OrderBy(lesson => DateTime.Parse(lesson.Data["Date"], CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal))
+            .OrderBy(lesson =>
+                DateTime.Parse(lesson.Data["Date"], CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal))
             .ToList();
 
-        _lessonsListBox.ItemsSource = dailyLessons.Select(lesson => {
-            DateTime lessonDate = DateTime.Parse(lesson.Data["Date"], CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal);
-            string subject = lesson.Data.GetValueOrDefault("SubjectName", "N/A");
-            string className = lesson.Data.GetValueOrDefault("ClassName", "N/A");
-            string room = lesson.Data.GetValueOrDefault("Room", "N/A");
+        _lessonsListBox.ItemsSource = dailyLessons.Select(lesson =>
+        {
+            var lessonDate = DateTime.Parse(lesson.Data["Date"], CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeLocal);
+            var subject = lesson.Data.GetValueOrDefault("SubjectName", "N/A");
+            var className = lesson.Data.GetValueOrDefault("ClassName", "N/A");
+            var room = lesson.Data.GetValueOrDefault("Room", "N/A");
             return $"{lessonDate:HH:mm} - {room} - {className} - {subject}";
         }).ToList();
-        
+
         if (_editPanel != null) _editPanel.IsVisible = false;
         _selectedLesson = null;
     }
 
     private void LessonsListBox_SelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (_lessonsListBox == null || _lessonsListBox.SelectedItem == null || _editPanel == null || _roomTextBox == null || _datePicker?.SelectedDate == null)
+        if (_lessonsListBox == null || _lessonsListBox.SelectedItem == null || _editPanel == null ||
+            _roomTextBox == null || _datePicker?.SelectedDate == null)
         {
             if (_editPanel != null) _editPanel.IsVisible = false;
             return;
         }
 
         var selectedDate = _datePicker.SelectedDate.Value.Date;
-        var dailyLessons = _allLessons?.
-            Where(lesson => lesson.Data.ContainsKey("Date") && 
-                             DateTime.TryParse(lesson.Data["Date"], CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var lessonDate) && 
-                             lessonDate.Date == selectedDate)
-            .OrderBy(lesson => DateTime.Parse(lesson.Data["Date"], CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal))
+        var dailyLessons = _allLessons?.Where(lesson => lesson.Data.ContainsKey("Date") &&
+                                                        DateTime.TryParse(lesson.Data["Date"],
+                                                            CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal,
+                                                            out var lessonDate) &&
+                                                        lessonDate.Date == selectedDate)
+            .OrderBy(lesson =>
+                DateTime.Parse(lesson.Data["Date"], CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal))
             .ToList();
 
-        int selectedIndex = _lessonsListBox.SelectedIndex;
+        var selectedIndex = _lessonsListBox.SelectedIndex;
         if (dailyLessons != null && selectedIndex >= 0 && selectedIndex < dailyLessons.Count)
         {
             _selectedLesson = dailyLessons[selectedIndex];
@@ -161,9 +170,11 @@ public class TeremKezeloView : IEvolView
 
     private void SaveButton_Click(object? sender, RoutedEventArgs e)
     {
-        if (_context == null || _selectedLesson == null || _roomTextBox == null || string.IsNullOrWhiteSpace(_roomTextBox.Text))
+        if (_context == null || _selectedLesson == null || _roomTextBox == null ||
+            string.IsNullOrWhiteSpace(_roomTextBox.Text))
         {
-            if (_statusTextBlock != null) _statusTextBlock.Text = "Hiba: Nincs kiválasztott óra vagy az új terem neve érvénytelen.";
+            if (_statusTextBlock != null)
+                _statusTextBlock.Text = "Hiba: Nincs kiválasztott óra vagy az új terem neve érvénytelen.";
             return;
         }
 
@@ -172,11 +183,11 @@ public class TeremKezeloView : IEvolView
 
         try
         {
-            int savedId = _context.SaveEntity(LessonEntityType, newData, _selectedLesson.Id);
+            var savedId = _context.SaveEntity(LessonEntityType, newData, _selectedLesson.Id);
             if (savedId > 0)
             {
                 if (_statusTextBlock != null) _statusTextBlock.Text = "Terem sikeresen módosítva!";
-                LoadAllLessons(); 
+                LoadAllLessons();
             }
             else
             {

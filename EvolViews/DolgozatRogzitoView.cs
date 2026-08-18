@@ -1,33 +1,36 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Globalization;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
-using Kreta.Core;
 using Kreta.Contexts;
+using Kreta.Core;
 
 public class DolgozatRogzitoView : IEvolView
 {
-    private ITeacherContext? _context;
+    private readonly ITeacherContext? _context;
 
     private ComboBox? _classComboBox;
-    private ComboBox? _subjectComboBox;
-    private TextBox? _topicTextBox;
     private DatePicker? _datePicker;
     private TextBlock? _statusTextBlock;
+    private ComboBox? _subjectComboBox;
+    private TextBox? _topicTextBox;
 
-    public new string Name => "Dolgozat Időpont Rögzítése";
-    public string Description => "Új dolgozat időpontjának felvétele egy osztály számára.";
-
-    public DolgozatRogzitoView() { }
+    public DolgozatRogzitoView()
+    {
+    }
 
     public DolgozatRogzitoView(ITeacherContext context)
     {
         _context = context;
     }
+
+    public new string Name => "Dolgozat Időpont Rögzítése";
+    public string Description => "Új dolgozat időpontjának felvétele egy osztály számára.";
 
     public Control CreateView()
     {
@@ -96,26 +99,19 @@ public class DolgozatRogzitoView : IEvolView
         if (_context == null || _classComboBox == null || _subjectComboBox == null) return;
 
         var classes = _context.GetAllClasses();
-        if (classes != null)
-        {
-            _classComboBox.ItemsSource = classes;
-        }
+        if (classes != null) _classComboBox.ItemsSource = classes;
 
         var subjects = _context.GetAllSubjects();
-        if (subjects != null)
-        {
-            _subjectComboBox.ItemsSource = subjects.Select(s => s.Name).ToList();
-        }
+        if (subjects != null) _subjectComboBox.ItemsSource = subjects.Select(s => s.Name).ToList();
     }
 
-    private void SaveButton_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void SaveButton_Click(object? sender, RoutedEventArgs e)
     {
-        if (_context == null || _classComboBox == null || _subjectComboBox == null || _topicTextBox == null || _datePicker == null || _statusTextBlock == null)
-        {
-            return;
-        }
+        if (_context == null || _classComboBox == null || _subjectComboBox == null || _topicTextBox == null ||
+            _datePicker == null || _statusTextBlock == null) return;
 
-        if (_classComboBox.SelectedItem == null || _subjectComboBox.SelectedItem == null || string.IsNullOrWhiteSpace(_topicTextBox.Text) || !_datePicker.SelectedDate.HasValue)
+        if (_classComboBox.SelectedItem == null || _subjectComboBox.SelectedItem == null ||
+            string.IsNullOrWhiteSpace(_topicTextBox.Text) || !_datePicker.SelectedDate.HasValue)
         {
             _statusTextBlock.Text = "Hiba: Minden mező kitöltése kötelező!";
             _statusTextBlock.Foreground = Brushes.Red;
@@ -147,7 +143,7 @@ public class DolgozatRogzitoView : IEvolView
             _context.SaveEntity("DolgozatIdopont", data);
             _statusTextBlock.Text = "Dolgozat sikeresen rögzítve!";
             _statusTextBlock.Foreground = Brushes.Green;
-            
+
             _classComboBox.SelectedIndex = -1;
             _subjectComboBox.SelectedIndex = -1;
             _topicTextBox.Text = "";

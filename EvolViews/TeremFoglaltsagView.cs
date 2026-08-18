@@ -1,33 +1,35 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Globalization;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
-using Kreta.Core;
 using Kreta.Contexts;
+using Kreta.Core;
 
 public class TeremFoglaltsagView : IEvolView
 {
-    private IDirectorContext? _context;
+    private const string LessonEntityType = "Lesson";
+    private readonly IDirectorContext? _context;
+
+    private List<GenericRecord>? _allLessons;
     private DatePicker? _datePicker;
     private ListBox? _occupancyListBox;
     private TextBlock? _statusTextBlock;
 
-    private List<GenericRecord>? _allLessons;
-    private const string LessonEntityType = "Lesson";
-
-    public new string Name => "Teremfoglaltsági Lista";
-    public string Description => "Teremfoglaltság megtekintése osztályok és időpontok szerint.";
-
-    public TeremFoglaltsagView() { }
+    public TeremFoglaltsagView()
+    {
+    }
 
     public TeremFoglaltsagView(IDirectorContext context)
     {
         _context = context;
     }
+
+    public new string Name => "Teremfoglaltsági Lista";
+    public string Description => "Teremfoglaltság megtekintése osztályok és időpontok szerint.";
 
     public Control CreateView()
     {
@@ -80,7 +82,7 @@ public class TeremFoglaltsagView : IEvolView
             }
             else
             {
-                 SetStatus($"Összesen {_allLessons.Count} óra betöltve.", false);
+                SetStatus($"Összesen {_allLessons.Count} óra betöltve.", false);
             }
         }
         catch (Exception ex)
@@ -99,15 +101,14 @@ public class TeremFoglaltsagView : IEvolView
     {
         if (_occupancyListBox == null || _datePicker?.SelectedDate == null || _allLessons == null) return;
 
-        DateTime selectedDate = _datePicker.SelectedDate.Value.Date;
+        var selectedDate = _datePicker.SelectedDate.Value.Date;
 
         var lessonsForDay = _allLessons
             .Where(lesson =>
             {
-                if (lesson.Data.TryGetValue("Date", out var dateStr) && DateTime.TryParse(dateStr, CultureInfo.InvariantCulture, DateTimeStyles.None, out var lessonDate))
-                {
+                if (lesson.Data.TryGetValue("Date", out var dateStr) && DateTime.TryParse(dateStr,
+                        CultureInfo.InvariantCulture, DateTimeStyles.None, out var lessonDate))
                     return lessonDate.Date == selectedDate;
-                }
                 return false;
             })
             .OrderBy(lesson => DateTime.Parse(lesson.Data["Date"], CultureInfo.InvariantCulture))
@@ -115,7 +116,6 @@ public class TeremFoglaltsagView : IEvolView
             .ToList();
 
         if (lessonsForDay.Any())
-        {
             _occupancyListBox.ItemsSource = lessonsForDay.Select(lesson =>
             {
                 var time = DateTime.Parse(lesson.Data["Date"], CultureInfo.InvariantCulture).ToString("HH:mm");
@@ -124,11 +124,8 @@ public class TeremFoglaltsagView : IEvolView
                 var subject = lesson.Data.GetValueOrDefault("SubjectName", "Ismeretlen tantárgy");
                 return $"{time} - {room}: {className} ({subject})";
             }).ToList();
-        }
         else
-        {
             _occupancyListBox.ItemsSource = new List<string> { "Nincs rögzített óra a kiválasztott napon." };
-        }
     }
 
     private void SetStatus(string message, bool isError)
